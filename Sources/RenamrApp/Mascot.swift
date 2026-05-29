@@ -14,29 +14,18 @@ struct Mascot: View {
 
     var body: some View {
         ZStack {
-            // single leaf on the crown (a sprout, not ears)
-            LeafShape()
-                .fill(Brand.leafGradient)
-                .frame(width: S * 0.26, height: S * 0.34)
-                .rotationEffect(.degrees(-10))
-                .offset(y: -S * 0.34)
-
-            // body
             Circle()
                 .fill(Brand.gradient)
-                .frame(width: S * 0.74, height: S * 0.74)
+                .frame(width: S * 0.84, height: S * 0.84)
                 .overlay(
                     Ellipse().fill(.white.opacity(0.16))
-                        .frame(width: S * 0.34, height: S * 0.20)
-                        .offset(x: -S * 0.12, y: -S * 0.14)
+                        .frame(width: S * 0.38, height: S * 0.22)
+                        .offset(x: -S * 0.13, y: -S * 0.16)
                 )
-                .offset(y: S * 0.04)
-
-            // face
-            face.offset(y: S * 0.04)
+            face
         }
         .frame(width: S, height: S)
-        .offset(y: animated && bob ? -S * 0.025 : 0)
+        .offset(y: animated && bob ? -S * 0.02 : 0)
         .onAppear {
             guard animated else { return }
             withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) { bob = true }
