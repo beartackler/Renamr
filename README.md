@@ -28,18 +28,35 @@ See [`PLAN.md`](PLAN.md) for the roadmap (version-space search, disagreement loo
 
 ## Status
 
-Early. The engine (`RenamrCore`) and a CLI exist with a passing test suite; the GUI app is next. The engine's algorithm is validated on the cases in `Tests/` (date reformat + reorder + drop + re-case + counter, on a single example).
+Working v0.1 — native SwiftUI app (`Renamr.app`), a CLI (`renamr`), and the engine, with a 24-case test suite plus a 160-scenario benchmark (`swift run renamr-corpus Tests/Fixtures/corpus-benchmark.json`). Handles dates (many layouts incl. month names), times, counters (pad/strip/renumber), reordering, dropping, re-casing, variable-length titles, separator/case normalization, and per-file extensions. When it isn't sure, it **flags — it never silently mangles a file**.
 
-## Build & test
+## Install
 
-Requires a working Swift 6 toolchain (Xcode or Command Line Tools).
+1. Download `Renamr.dmg` from the [Releases](https://github.com/beartackler/Renamr/releases) page.
+2. Open it and drag **Renamr** to **Applications**.
 
+### First launch (one time)
+Renamr is free and open source but not notarized by Apple, so the first launch needs one extra step (this is normal for indie/OSS Mac apps):
+
+- Double-click Renamr. macOS says it "could not verify" the app — click **Done** (not Move to Trash).
+- Open **System Settings ▸ Privacy & Security**, scroll to **Security**, and click **Open Anyway** next to Renamr, then confirm.
+- It opens normally from then on.
+
+Power-user shortcut instead of the above:
 ```sh
-swift test          # run the engine test suite
-swift run renamr "IMG_20240115_beach_DSC0931.jpg" "2024-01-15 Beach 0931.jpg" *.jpg
+xattr -dr com.apple.quarantine /Applications/Renamr.app
 ```
 
-The CLI prints a preview (`✓` confident, `?` flagged); it does not rename files yet.
+## Build from source
+
+Requires Xcode (or Swift 6 Command Line Tools).
+
+```sh
+swift test                       # run the engine test suite
+swift run renamr "DSC0931.JPG" "Beach 1.jpg" *.JPG   # CLI preview (✓ confident, ? flagged)
+./Scripts/package-app.sh         # build Renamr.app (ad-hoc signed, local use)
+./Scripts/build-dmg.sh           # build a distributable Renamr-<version>.dmg
+```
 
 ## Project layout
 
