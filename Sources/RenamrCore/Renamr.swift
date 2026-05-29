@@ -113,6 +113,11 @@ public enum Renamr {
                 if let token = lookup(ref, in: byKind), token.text.count >= length {
                     out += transform.apply(String(token.text.prefix(length)))
                 } else { resolved = false }
+            case .copyRest(let kind, let from, let separator, let transform):
+                let tokens = byKind[kind] ?? []
+                if from < tokens.count {
+                    out += tokens[from...].map { transform.apply($0.text) }.joined(separator: separator)
+                } else { resolved = false }
             case .dateReformat(let ref, let format):
                 if let token = lookup(ref, in: byKind), let date = token.date { out += format.format(date) } else { resolved = false }
             case .number(let ref, let padWidth):
@@ -151,6 +156,7 @@ public enum Renamr {
         }
 
         let extPolicy = extensionPolicy(from: beforeExt, to: afterExt)
+        let wordCount = byKind[.word]?.count ?? 0
         let primary = perToken.map { $0[0] }
         var programs: [[Instruction]] = [primary]
         for (index, choices) in perToken.enumerated() where choices.count > 1 {
@@ -160,7 +166,41 @@ public enum Renamr {
                 programs.append(variant)
             }
         }
-        return programs.map { Program(instructions: $0, ext: extPolicy) }
+        // Collapse a trailing run of word-copies that reaches the LAST word into a
+        // single "keep the rest" instruction, so variable-length tails (song or
+        // movie titles) generalize instead of silently dropping words.
+        return programs.map { Program(instructions: collapseRest($0, wordCount: wordCount), ext: extPolicy) }
+    }
+
+    /// If the program ends with copy(word#k), sep, copy(word#k+1), …, copy(word#last)
+    /// — a consecutive run of same-cased word copies, joined by one separator,
+    /// reaching the final input word — replace that run with `.copyRest`.
+    private static func collapseRest(_ program: [Instruction], wordCount: Int) -> [Instruction] {
+        guard wordCount > 0, let last = program.last,
+              case let .copy(lastRef, transform) = last,
+              lastRef.kind == .word, lastRef.ordinal == wordCount - 1
+        else { return program }
+
+        var ordinals = [lastRef.ordinal]
+        var separator: String?
+        var runStart = program.count - 1
+        var i = program.count - 2
+        while i - 1 >= 0 {
+            guard case let .literal(lit) = program[i],
+                  case let .copy(ref, t) = program[i - 1],
+                  ref.kind == .word, t == transform, ref.ordinal == ordinals.last! - 1,
+                  separator == nil || separator == lit
+            else { break }
+            separator = lit
+            ordinals.append(ref.ordinal)
+            runStart = i - 1
+            i -= 2
+        }
+
+        guard ordinals.count >= 2, let sep = separator, let from = ordinals.last else { return program }
+        var result = Array(program[0..<runStart])
+        result.append(.copyRest(.word, from: from, separator: sep, transform))
+        return result
     }
 
     /// Every way an input token could explain one output token, with a cost.
@@ -249,6 +289,7 @@ public enum Renamr {
         switch instruction {
         case .copy(let r, _): return r.ordinal
         case .prefix(let r, _, _): return r.ordinal
+        case .copyRest(_, let from, _, _): return from
         case .dateReformat(let r, _): return r.ordinal
         case .number(let r, _): return r.ordinal
         case .literal: return Int.max

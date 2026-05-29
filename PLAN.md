@@ -35,8 +35,14 @@ The moat is **execution quality**, not idea novelty (StringSolver proves the int
 - [x] Extension-case normalization (PHOTO.JPG → photo.jpg, per-file)
 - [x] Prefix/abbreviation extraction (January → Jan, generalizes to Feb/Mar)
 - [x] **Realistic-filename test coverage** — screenshots, Pixel, DSLR strip+counter, trip-label+counter (14 tests). Proven on names people actually have.
-- [ ] **Variable-length fields** (the real next gap) — "keep the rest of the words" (song titles, movie names) doesn't generalize yet; needs span/“rest-of” operators
+- [x] **Variable-length fields** — `copyRest` collapses a trailing run of word-copies that reaches the last word into "keep the rest", so song/movie/episode titles of any length generalize. Tested (15/15).
 - [ ] Full version-space algebra for compound ambiguity; time tokens (screenshot times); date-locale (01/02) resolution
+
+## Brand & navigation
+- [x] **Sprig** — Renamr's mascot, a cheerful sprout drawn in vectors (`Mascot.swift`), with idle/happy/thinking moods; present in the header (reacts to state) + empty state + disagreement prompt.
+- [x] **Green-floral rebrand** (`Theme.swift` Brand: leaf green + blossom-pink accent); icon is a leaf emblem.
+- [x] **Folder navigation** — folders are listed and stepped into (not treated as rename targets); path bar with Up; files-only get inline rename.
+- [x] **Production layout** — compact centered empty state that teaches via before→after example chips; sectioned folder/file list; hover states; consistent spacing.
 
 ## Milestone 3.5 — Meet users IN Finder (reduce the "open an app and drag" friction)
 The real workflow is files in Finder, not dragging into a window.

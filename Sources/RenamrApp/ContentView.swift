@@ -5,140 +5,178 @@ import RenamrCore
 struct ContentView: View {
     @EnvironmentObject var model: RenameModel
     @State private var dropTargeted = false
-    @State private var pulse = false
     @FocusState private var editing: Bool
+
+    private var mood: Mascot.Mood {
+        if model.needsMoreInfo != nil { return .thinking }
+        if model.confidentChangeCount > 0 { return .happy }
+        return .idle
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             header
-            Divider().opacity(0.5)
+            Divider().opacity(0.4)
             Group {
-                if model.hasFolder { fileList } else { emptyState }
+                if model.hasFolder { folderView } else { emptyState }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            Divider().opacity(0.5)
+            Divider().opacity(0.4)
             footer
         }
+        .background(Color(nsColor: .windowBackgroundColor))
         .onDrop(of: [.fileURL], isTargeted: $dropTargeted) { model.handleDrop($0) }
     }
 
     // MARK: header
 
     private var header: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "wand.and.stars")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(Brand.gradient)
+        HStack(spacing: 9) {
+            Mascot(mood: mood, size: 26)
             Text("Renamr").font(.headline)
             Text(Voice.tagline).font(.caption).foregroundStyle(.secondary)
-            if model.hasFolder {
-                Button { model.chooseFolder() } label: { Image(systemName: "folder") }
-                    .buttonStyle(.borderless).help("Open a different folder")
-                if model.directoryURL != nil {
-                    Text(model.directoryURL!.lastPathComponent).font(.caption).foregroundStyle(.tertiary).lineLimit(1)
-                }
-            }
             Spacer()
-            Text(model.statusMessage).font(.callout).foregroundStyle(.secondary).lineLimit(1)
+            Text(model.statusMessage)
+                .font(.callout).foregroundStyle(.secondary).lineLimit(1)
                 .animation(.default, value: model.statusMessage)
         }
-        .padding(.horizontal, 14).padding(.vertical, 10)
+        .padding(.horizontal, 14).padding(.vertical, 9)
     }
 
-    // MARK: empty state
+    // MARK: empty state — compact, centered, teaches at a glance
 
     private var emptyState: some View {
-        VStack(spacing: 16) {
-            ZStack {
-                Circle().fill(Brand.gradient)
-                    .frame(width: 96, height: 96)
-                    .shadow(color: Brand.accent.opacity(pulse ? 0.55 : 0.3), radius: pulse ? 26 : 16)
-                    .scaleEffect(pulse ? 1.03 : 1.0)
-                Image(systemName: "wand.and.stars")
-                    .font(.system(size: 42, weight: .semibold))
-                    .foregroundStyle(.white)
-            }
-            .onAppear { withAnimation(.easeInOut(duration: 1.9).repeatForever(autoreverses: true)) { pulse = true } }
+        VStack(spacing: 18) {
+            Spacer(minLength: 0)
+            Mascot(mood: .happy, size: 116)
 
-            VStack(spacing: 6) {
-                Text(Voice.emptyTitle).font(.title2.weight(.semibold))
+            VStack(spacing: 7) {
+                Text(Voice.emptyTitle).font(.system(size: 22, weight: .semibold))
                 Text(Voice.emptySubtitle)
                     .font(.callout).foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center).frame(maxWidth: 420)
+                    .multilineTextAlignment(.center).frame(maxWidth: 380)
             }
+
+            // Show what it does — three real before → after examples.
+            VStack(spacing: 6) {
+                exampleChip("DSC0931.JPG", "0931.jpg")
+                exampleChip("Screenshot 2026-05-29 at 7.18 PM.png", "2026-05-29 Screenshot.png")
+                exampleChip("01 - Daft Punk - Get Lucky.mp3", "01 Get Lucky.mp3")
+            }
+            .padding(.vertical, 4)
 
             HStack(spacing: 10) {
                 Button("Open Folder…") { model.chooseFolder() }
-                    .buttonStyle(.borderedProminent).tint(Brand.accent).controlSize(.large)
-                Button("Use Frontmost Finder Folder") { model.openFrontmostFinderFolder() }
+                    .buttonStyle(.borderedProminent).tint(Brand.green).controlSize(.large)
+                Button("Use Finder Folder") { model.openFrontmostFinderFolder() }
                     .controlSize(.large)
             }
-            .padding(.top, 2)
 
             Label(Voice.finderTip, systemImage: "contextualmenu.and.cursorarrow")
-                .font(.caption).foregroundStyle(.tertiary).padding(.top, 4)
+                .font(.caption).foregroundStyle(.tertiary)
+            Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(40)
-        .background(dropTargeted ? Brand.accent.opacity(0.08) : Color.clear)
+        .padding(.horizontal, 40)
+        .background(dropTargeted ? Brand.green.opacity(0.07) : Color.clear)
         .contentShape(Rectangle())
     }
 
-    // MARK: the unified, inline-editable list
+    private func exampleChip(_ before: String, _ after: String) -> some View {
+        HStack(spacing: 8) {
+            Text(before).foregroundStyle(.secondary).lineLimit(1)
+            Image(systemName: "arrow.right").font(.caption2).foregroundStyle(.tertiary)
+            Text(after).foregroundStyle(Brand.green).lineLimit(1)
+        }
+        .font(.system(size: 11, design: .monospaced))
+        .padding(.horizontal, 11).padding(.vertical, 6)
+        .background(Brand.green.opacity(0.07), in: Capsule())
+    }
 
-    private var fileList: some View {
+    // MARK: folder view — path bar + folders + inline-editable files
+
+    private var folderView: some View {
         VStack(spacing: 0) {
+            pathBar
+            Divider().opacity(0.4)
+
             if let prompt = model.needsMoreInfo { disagreementBanner(prompt).padding([.horizontal, .top], 12) }
 
-            HStack {
-                Text(model.selectedFile == nil ? "Click a file and type its new name" : "Type the new name — the rest follow")
-                    .font(.callout).foregroundStyle(.secondary)
-                Spacer()
-                if model.examples.count >= 1 {
-                    Label("learning from \(model.examples.count)", systemImage: "brain")
-                        .font(.caption2).foregroundStyle(Brand.accent)
-                }
-            }
-            .padding(.horizontal, 14).padding(.top, 10).padding(.bottom, 4)
-
             ScrollView {
-                LazyVStack(spacing: 2) {
-                    ForEach(model.previews) { preview in
-                        FileRow(
-                            preview: preview,
-                            isSelected: preview.original == model.selectedFile,
-                            correctedName: $model.correctedName,
-                            editing: $editing,
-                            onTap: { model.selectExample(preview.original); editing = true },
-                            onEdit: { model.recompute() }
-                        )
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    if !model.folders.isEmpty {
+                        sectionHeader("Folders")
+                        ForEach(model.folders, id: \.self) { folder in
+                            FolderRow(name: folder) { model.enter(folder); editing = false }
+                        }
+                    }
+                    if !model.previews.isEmpty {
+                        sectionHeader(model.selectedFile == nil ? "Files — click one and type its new name" : "Type the new name — the rest follow")
+                        ForEach(model.previews) { preview in
+                            FileRow(
+                                preview: preview,
+                                isSelected: preview.original == model.selectedFile,
+                                correctedName: $model.correctedName,
+                                editing: $editing,
+                                onTap: { model.selectExample(preview.original); editing = true },
+                                onEdit: { model.recompute() }
+                            )
+                        }
+                    } else if model.folders.isEmpty {
+                        Text("This folder is empty.").font(.callout).foregroundStyle(.secondary).padding(12)
                     }
                 }
-                .padding(.horizontal, 10).padding(.bottom, 8)
-                .animation(.easeOut(duration: 0.18), value: model.previews)
+                .padding(.horizontal, 10).padding(.vertical, 8)
+                .animation(.easeOut(duration: 0.16), value: model.previews)
             }
 
             if model.flaggedCount > 0 {
-                Label(Voice.safety, systemImage: "lock.shield")
+                Label(Voice.safety, systemImage: "leaf")
                     .font(.caption2).foregroundStyle(.secondary)
                     .padding(.horizontal, 14).padding(.bottom, 8)
             }
         }
     }
 
+    private var pathBar: some View {
+        HStack(spacing: 8) {
+            Button { model.goUp(); editing = false } label: {
+                Image(systemName: "chevron.up").font(.system(size: 11, weight: .semibold))
+            }
+            .buttonStyle(.borderless).help("Up to the enclosing folder")
+            Image(systemName: "folder.fill").foregroundStyle(Brand.green).font(.system(size: 12))
+            Text(model.directoryURL?.lastPathComponent ?? "")
+                .font(.system(size: 12, weight: .medium)).lineLimit(1)
+            Spacer()
+            if model.examples.count >= 1 {
+                Label("learning from \(model.examples.count)", systemImage: "leaf.fill")
+                    .font(.caption2).foregroundStyle(Brand.green)
+            }
+            Button("Change…") { model.chooseFolder() }.controlSize(.small).buttonStyle(.borderless)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 8)
+    }
+
+    private func sectionHeader(_ text: String) -> some View {
+        Text(text)
+            .font(.caption2.weight(.semibold)).textCase(.uppercase)
+            .foregroundStyle(.tertiary)
+            .padding(.horizontal, 10).padding(.top, 8).padding(.bottom, 2)
+    }
+
     private func disagreementBanner(_ prompt: DisagreementPrompt) -> some View {
-        HStack(alignment: .top, spacing: 9) {
-            Image(systemName: "questionmark.bubble.fill").foregroundStyle(Brand.accent)
+        HStack(alignment: .top, spacing: 10) {
+            Mascot(mood: .thinking, size: 30, animated: false)
             VStack(alignment: .leading, spacing: 3) {
                 Text(Voice.ambiguityTitle).font(.callout.weight(.semibold))
                 Text("For “\(prompt.file)”, did you mean " + prompt.options.prefix(2).map { "“\($0)”" }.joined(separator: " or ") + "?")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            Button("Teach me") { model.teachAmbiguousFile(); editing = true }.controlSize(.small)
+            Button("Show me") { model.teachAmbiguousFile(); editing = true }.controlSize(.small)
         }
         .padding(11)
-        .background(Brand.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 9))
+        .background(Brand.blossom.opacity(0.14), in: RoundedRectangle(cornerRadius: 10))
     }
 
     // MARK: footer
@@ -156,7 +194,7 @@ struct ContentView: View {
                 Text(model.confidentChangeCount > 0 ? "Rename \(model.confidentChangeCount) files" : "Rename")
                     .frame(minWidth: 140)
             }
-            .buttonStyle(.borderedProminent).tint(Brand.accent)
+            .buttonStyle(.borderedProminent).tint(Brand.green)
             .keyboardShortcut(.defaultAction)
             .disabled(model.confidentChangeCount == 0)
         }
@@ -164,8 +202,28 @@ struct ContentView: View {
     }
 }
 
-/// One row: the original name, or an inline editor when it's the file you're
-/// teaching with. Changed rows show "→ newname" live.
+// MARK: - Rows
+
+private struct FolderRow: View {
+    let name: String
+    let onOpen: () -> Void
+    @State private var hover = false
+
+    var body: some View {
+        HStack(spacing: 9) {
+            Image(systemName: "folder.fill").foregroundStyle(Brand.green).font(.system(size: 13)).frame(width: 16)
+            Text(name).font(.system(.body)).lineLimit(1)
+            Spacer()
+            Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 10).padding(.vertical, 7)
+        .background(RoundedRectangle(cornerRadius: 7).fill(hover ? Brand.green.opacity(0.10) : .clear))
+        .contentShape(Rectangle())
+        .onHover { hover = $0 }
+        .onTapGesture(perform: onOpen)
+    }
+}
+
 private struct FileRow: View {
     let preview: RenamePreview
     let isSelected: Bool
@@ -173,10 +231,11 @@ private struct FileRow: View {
     @FocusState.Binding var editing: Bool
     let onTap: () -> Void
     let onEdit: () -> Void
+    @State private var hover = false
 
     var body: some View {
         HStack(spacing: 9) {
-            Image(systemName: icon).foregroundStyle(tint).font(.system(size: 12)).frame(width: 15)
+            Image(systemName: icon).foregroundStyle(tint).font(.system(size: 12)).frame(width: 16)
 
             if isSelected {
                 TextField("new name", text: $correctedName)
@@ -195,8 +254,7 @@ private struct FileRow: View {
                     Image(systemName: "arrow.right").font(.caption2).foregroundStyle(.tertiary)
                     Text(preview.proposed)
                         .font(.system(.callout, design: .monospaced))
-                        .foregroundStyle(Brand.accent)
-                        .lineLimit(1)
+                        .foregroundStyle(Brand.green).lineLimit(1)
                 }
             }
             Spacer(minLength: 0)
@@ -204,21 +262,22 @@ private struct FileRow: View {
         .padding(.horizontal, 10).padding(.vertical, 7)
         .background(
             RoundedRectangle(cornerRadius: 7)
-                .fill(isSelected ? Brand.accent.opacity(0.14) : Color.clear)
+                .fill(isSelected ? Brand.green.opacity(0.16) : (hover ? Brand.green.opacity(0.06) : .clear))
         )
         .contentShape(Rectangle())
+        .onHover { hover = $0 }
         .onTapGesture { onTap() }
     }
 
     private var icon: String {
         if isSelected { return "pencil.circle.fill" }
-        if !preview.isConfident { return "questionmark.circle" }
+        if !preview.isConfident { return "circle.dashed" }
         return preview.isChange ? "checkmark.circle.fill" : "circle"
     }
 
     private var tint: Color {
-        if isSelected { return Brand.accent }
-        if !preview.isConfident { return .orange }
-        return preview.isChange ? .green : .secondary.opacity(0.5)
+        if isSelected { return Brand.green }
+        if !preview.isConfident { return .secondary.opacity(0.6) }
+        return preview.isChange ? Brand.green : .secondary.opacity(0.4)
     }
 }

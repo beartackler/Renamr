@@ -149,6 +149,20 @@ final class RenamrTests: XCTestCase {
         XCTAssertEqual(out, ["Jan 2024.txt", "Feb 2024.txt", "Mar 2024.txt"])
     }
 
+    // Variable-length tail: "Get Lucky" (2 words) must generalize to titles of
+    // any length — "keep everything after the artist", not "keep two words".
+    func testVariableLengthTitle() {
+        let out = run(
+            example: ("01 - Daft Punk - Get Lucky.mp3", "01 Get Lucky.mp3"),
+            files: [
+                "01 - Daft Punk - Get Lucky.mp3",
+                "02 - Daft Punk - Instant Crush.mp3",
+                "03 - Daft Punk - Doin it Right.mp3",
+            ]
+        )
+        XCTAssertEqual(out, ["01 Get Lucky.mp3", "02 Instant Crush.mp3", "03 Doin it Right.mp3"])
+    }
+
     // Tokenizer: a date is one token; an alpha-prefixed counter splits in two.
     func testTokenization() {
         let tokens = Tokenizer.tokenize("IMG_20240115_beach_DSC0931")

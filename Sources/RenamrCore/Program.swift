@@ -33,6 +33,7 @@ public enum Instruction: Equatable, Sendable {
     case literal(String)                              // a constant (typically a separator)
     case copy(SourceRef, CaseTransform)               // copy a source token, optionally re-cased
     case prefix(SourceRef, length: Int, CaseTransform) // first N chars of a word, re-cased (January -> Jan)
+    case copyRest(TokenKind, from: Int, separator: String, CaseTransform) // all tokens of a kind from N to the end, joined ("Get Lucky", "Doin it Right")
     case dateReformat(SourceRef, DateFormatSig)       // re-parse a source date, emit in a new layout
     case number(SourceRef, padWidth: Int)             // emit a source number with new zero-padding (0 = none)
 }

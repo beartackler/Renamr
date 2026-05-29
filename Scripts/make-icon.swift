@@ -21,10 +21,10 @@ func makePNG(px: Int) -> Data {
     let clip = CGPath(roundedRect: rect, cornerWidth: s * 0.2237, cornerHeight: s * 0.2237, transform: nil)
     cg.addPath(clip); cg.clip()
 
-    // Brand gradient: indigo -> violet, top-left to bottom-right.
+    // Brand gradient: leaf green -> emerald, top-left to bottom-right.
     let cs = CGColorSpaceCreateDeviceRGB()
-    let c0 = NSColor(srgbRed: 0.40, green: 0.34, blue: 0.97, alpha: 1).cgColor
-    let c1 = NSColor(srgbRed: 0.73, green: 0.30, blue: 0.96, alpha: 1).cgColor
+    let c0 = NSColor(srgbRed: 0.36, green: 0.78, blue: 0.49, alpha: 1).cgColor
+    let c1 = NSColor(srgbRed: 0.13, green: 0.52, blue: 0.36, alpha: 1).cgColor
     let grad = CGGradient(colorsSpace: cs, colors: [c0, c1] as CFArray, locations: [0, 1])!
     cg.drawLinearGradient(grad, start: CGPoint(x: 0, y: s), end: CGPoint(x: s, y: 0), options: [])
 
@@ -35,12 +35,12 @@ func makePNG(px: Int) -> Data {
     cg.drawRadialGradient(hi, startCenter: CGPoint(x: s * 0.3, y: s * 0.8), startRadius: 0,
                           endCenter: CGPoint(x: s * 0.3, y: s * 0.8), endRadius: s * 0.7, options: [])
 
-    // White wand-and-stars mark, centered.
-    if let sym = NSImage(systemSymbolName: "wand.and.stars", accessibilityDescription: nil) {
+    // White leaf mark, centered (the garden emblem; Sprig lives in-app).
+    if let sym = NSImage(systemSymbolName: "leaf.fill", accessibilityDescription: nil) {
         let conf = NSImage.SymbolConfiguration(pointSize: s * 0.42, weight: .semibold)
             .applying(NSImage.SymbolConfiguration(paletteColors: [.white]))
         if let glyph = sym.withSymbolConfiguration(conf) {
-            let target = s * 0.58
+            let target = s * 0.54
             let scale = target / max(glyph.size.width, glyph.size.height)
             let dw = glyph.size.width * scale, dh = glyph.size.height * scale
             glyph.draw(in: NSRect(x: (s - dw) / 2, y: (s - dh) / 2, width: dw, height: dh),

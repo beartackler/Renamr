@@ -9,6 +9,7 @@ final class RenameModel: ObservableObject {
     static let shared = RenameModel()
 
     @Published var directoryURL: URL?
+    @Published private(set) var folders: [String] = []   // subfolders you can step into
     @Published private(set) var files: [String] = []
     @Published var selectedFile: String?            // the file you're teaching with
     @Published var correctedName: String = ""        // your corrected name for it
@@ -100,8 +101,7 @@ final class RenameModel: ObservableObject {
 
     func load(_ url: URL, preselect: Set<String> = []) {
         directoryURL = url
-        let names = (try? FileManager.default.contentsOfDirectory(atPath: url.path)) ?? []
-        files = names.filter { !$0.hasPrefix(".") }.sorted()
+        listContents(url)
         examples = []
         selectedFile = preselect.first.flatMap { files.contains($0) ? $0 : nil }
         correctedName = selectedFile ?? ""
@@ -110,8 +110,33 @@ final class RenameModel: ObservableObject {
         previews = identityPreviews()
         warnings = []
         needsMoreInfo = nil
-        statusMessage = Voice.loaded(files.count)
+        statusMessage = Voice.loaded(files: files.count, folders: folders.count)
         if selectedFile != nil { recompute() }
+    }
+
+    /// Step into a subfolder.
+    func enter(_ folder: String) {
+        guard let dir = directoryURL else { return }
+        load(dir.appendingPathComponent(folder, isDirectory: true))
+    }
+
+    /// Go up to the parent folder.
+    func goUp() {
+        guard let dir = directoryURL else { return }
+        load(dir.deletingLastPathComponent())
+    }
+
+    private func listContents(_ url: URL) {
+        let fm = FileManager.default
+        let names = (try? fm.contentsOfDirectory(atPath: url.path)) ?? []
+        var dirs: [String] = [], regular: [String] = []
+        for name in names where !name.hasPrefix(".") {
+            var isDir: ObjCBool = false
+            fm.fileExists(atPath: url.appendingPathComponent(name).path, isDirectory: &isDir)
+            if isDir.boolValue { dirs.append(name) } else { regular.append(name) }
+        }
+        folders = dirs.sorted()
+        files = regular.sorted()
     }
 
     // MARK: - Teaching by example
@@ -213,8 +238,7 @@ final class RenameModel: ObservableObject {
     // MARK: - Helpers
 
     private func reload(_ url: URL) {
-        let names = (try? FileManager.default.contentsOfDirectory(atPath: url.path)) ?? []
-        files = names.filter { !$0.hasPrefix(".") }.sorted()
+        listContents(url)
         previews = identityPreviews()
         needsMoreInfo = nil
     }
