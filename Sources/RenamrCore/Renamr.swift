@@ -124,6 +124,8 @@ public enum Renamr {
                 } else { resolved = false }
             case .dateReformat(let ref, let format):
                 if let token = lookup(ref, in: byKind), let date = token.date { out += format.format(date) } else { resolved = false }
+            case .timeReformat(let ref, let format):
+                if let token = lookup(ref, in: byKind), let time = token.time { out += format.format(time) } else { resolved = false }
             case .number(let ref, let padWidth):
                 if let token = lookup(ref, in: byKind), let value = token.intValue { out += formatNumber(value, pad: padWidth) } else { resolved = false }
             case .sequence(let start, let step, let padWidth):
@@ -253,6 +255,18 @@ public enum Renamr {
                         candidates.append((.dateReformat(ref, format), 2))
                     }
                 }
+                if kind == .time, let inTime = token.time {
+                    // Output is a time token in some layout we can re-emit (no 12↔24 math).
+                    if out.kind == .time, let outFmt = out.timeFormat, outFmt.format(inTime) == out.text {
+                        candidates.append((.timeReformat(ref, outFmt), 2))
+                    }
+                    // Output is a bare digit run (e.g. 143000 / 1430).
+                    if out.kind == .number {
+                        for fmt in TimeFormat.compact where fmt.format(inTime) == out.text {
+                            candidates.append((.timeReformat(ref, fmt), 2))
+                        }
+                    }
+                }
                 if kind == .number, let value = token.intValue, out.text.allSatisfy({ $0.isNumber }) {
                     for pad in [0, out.text.count] {
                         let formatted = formatNumber(value, pad: pad)
@@ -367,6 +381,7 @@ public enum Renamr {
         case .prefix(let r, _, _): return r.ordinal
         case .copyRest(_, let from, _, _): return from
         case .dateReformat(let r, _): return r.ordinal
+        case .timeReformat(let r, _): return r.ordinal
         case .number(let r, _): return r.ordinal
         case .sequence: return Int.max - 1
         case .normalize: return Int.max

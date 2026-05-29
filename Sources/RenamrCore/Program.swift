@@ -35,6 +35,7 @@ public enum Instruction: Equatable, Sendable {
     case prefix(SourceRef, length: Int, CaseTransform) // first N chars of a word, re-cased (January -> Jan)
     case copyRest(TokenKind, from: Int, separator: String, CaseTransform) // all tokens of a kind from N to the end, joined ("Get Lucky", "Doin it Right")
     case dateReformat(SourceRef, DateFormatSig)       // re-parse a source date, emit in a new layout
+    case timeReformat(SourceRef, TimeFormat)          // re-emit a source clock time in a new layout
     case number(SourceRef, padWidth: Int)             // emit a source number with new zero-padding (0 = none)
     case sequence(start: Int, step: Int, padWidth: Int) // renumber 1,2,3… by file position (the counter isn't in the name)
     case normalize(separator: String, transform: CaseTransform) // whole-name: remap every separator + re-case words (slug → Title Case)

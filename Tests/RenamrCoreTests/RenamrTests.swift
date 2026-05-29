@@ -229,6 +229,28 @@ final class RenamrTests: XCTestCase {
         XCTAssertNotEqual(result.previews.map(\.proposed), ["0115_report.txt", "0116_report.txt"])
     }
 
+    // Month-name textual date → ISO, moved to front.
+    func testMonthNameDate() {
+        let out = run(
+            example: ("Notes January 5, 2024.txt", "2024-01-05 Notes.txt"),
+            files: ["Notes January 5, 2024.txt", "Notes March 12, 2024.txt", "Notes Dec 31, 2023.txt"]
+        )
+        XCTAssertEqual(out, ["2024-01-05 Notes.txt", "2024-03-12 Notes.txt", "2023-12-31 Notes.txt"])
+    }
+
+    // Clock time: drop the Screenshot/at words and the AM/PM label, keep date + time digits.
+    func testTimeStripMeridiem() {
+        let out = run(
+            example: ("Screenshot 2023-11-02 at 8.15.44 AM.png", "2023-11-02 8.15.44.png"),
+            files: [
+                "Screenshot 2023-11-02 at 8.15.44 AM.png",
+                "Screenshot 2023-11-02 at 3.27.10 PM.png",
+                "Screenshot 2023-12-24 at 6.04.51 PM.png",
+            ]
+        )
+        XCTAssertEqual(out, ["2023-11-02 8.15.44.png", "2023-11-02 3.27.10.png", "2023-12-24 6.04.51.png"])
+    }
+
     // Tokenizer: a date is one token; an alpha-prefixed counter splits in two.
     func testTokenization() {
         let tokens = Tokenizer.tokenize("IMG_20240115_beach_DSC0931")

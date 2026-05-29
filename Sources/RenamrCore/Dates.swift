@@ -89,9 +89,45 @@ enum DateRecognizer {
         .compact,
     ]
 
+    static let monthNumbers: [String: Int] = [
+        "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+        "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+    ]
+
+    /// Textual dates with a month name: "January 5, 2024", "Jan 5 2024",
+    /// "5 Jan 2024", "5 January 2024" → a real date. Recognized BEFORE the numeric
+    /// layouts so they claim their span first.
+    private static func appendTextual(in s: String, _ result: inout [DateMatch], _ claimed: inout [Range<String.Index>]) {
+        let monthName = "jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec"
+        let patterns: [(String, isMDY: Bool)] = [
+            ("(?i)\\b(\(monthName))[a-z]*\\.?\\s+([0-9]{1,2})(?:st|nd|rd|th)?,?\\s+([0-9]{4})\\b", true),
+            ("(?i)\\b([0-9]{1,2})(?:st|nd|rd|th)?\\s+(\(monthName))[a-z]*\\.?\\s+([0-9]{4})\\b", false),
+        ]
+        for (pattern, isMDY) in patterns {
+            guard let regex = try? NSRegularExpression(pattern: pattern) else { continue }
+            for m in regex.matches(in: s, range: NSRange(s.startIndex..<s.endIndex, in: s)) {
+                guard let r = Range(m.range, in: s), !claimed.contains(where: { $0.overlaps(r) }) else { continue }
+                let monthGroup = isMDY ? 1 : 2
+                let dayGroup = isMDY ? 2 : 1
+                guard
+                    let mr = Range(m.range(at: monthGroup), in: s),
+                    let dr = Range(m.range(at: dayGroup), in: s),
+                    let yr = Range(m.range(at: 3), in: s),
+                    let month = monthNumbers[String(s[mr]).lowercased().prefix(3).lowercased()],
+                    let day = Int(s[dr]), let year = Int(s[yr])
+                else { continue }
+                let date = SimpleDate(year: year, month: month, day: day)
+                guard date.isValid else { continue }
+                result.append(DateMatch(range: r, date: date, format: .dashYMD, raw: String(s[r])))
+                claimed.append(r)
+            }
+        }
+    }
+
     static func matches(in s: String) -> [DateMatch] {
         var result: [DateMatch] = []
         var claimed: [Range<String.Index>] = []
+        appendTextual(in: s, &result, &claimed)
         for sig in priority {
             guard let regex = try? NSRegularExpression(pattern: sig.regexPattern) else { continue }
             let nsRange = NSRange(s.startIndex..<s.endIndex, in: s)
