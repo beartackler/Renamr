@@ -46,4 +46,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+
+    /// Files opened *with* Renamr (Finder "Open With", `open -a`, or the Finder
+    /// extension handing off a selection) load their folder, pre-scoped.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        guard !urls.isEmpty else { return }
+        RenameModel.shared.loadFiles(urls: urls)
+        NSApp.activate(ignoringOtherApps: true)
+    }
 }

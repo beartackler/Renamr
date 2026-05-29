@@ -82,11 +82,13 @@ public enum Renamr {
             if let proposed = result.proposed, result.resolved {
                 return RenamePreview(original: file, proposed: proposed, isConfident: true, note: nil)
             }
+            // Not confident → show the file unchanged rather than a half-built
+            // string. We flag it; we never propose a name we don't trust.
             return RenamePreview(
                 original: file,
-                proposed: result.proposed ?? file,
+                proposed: file,
                 isConfident: false,
-                note: "Some fields could not be located in this file"
+                note: "Some fields couldn't be located in this file — skipped"
             )
         }
 

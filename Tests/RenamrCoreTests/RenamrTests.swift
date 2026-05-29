@@ -62,6 +62,8 @@ final class RenamrTests: XCTestCase {
         )
         XCTAssertTrue(result.previews[0].isConfident)
         XCTAssertFalse(result.previews[1].isConfident, "a file with no date/second-word should not be claimed confident")
+        // A flagged file shows its ORIGINAL name unchanged, never a half-built string.
+        XCTAssertEqual(result.previews[1].proposed, "totally_unrelated.txt")
     }
 
     // Two number fields with coincidentally-equal values: one example is
