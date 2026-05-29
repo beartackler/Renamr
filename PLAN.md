@@ -45,7 +45,15 @@ The moat is **execution quality**, not idea novelty (StringSolver proves the int
 
 ### Honest engine ceiling (a one-example PBE engine can't do "everything")
 The corpus is deliberately adversarial. The realistic, inferable cases mostly pass; the long tail that remains is either **fundamentally un-inferable from a single example** (arithmetic offsets like +100, Roman→Arabic, accent-stripping, true 12h↔24h clock math, CamelCase splitting, thousands-commas) or **needs 2 examples** (locale-ambiguous dates). The safety principle holds: when unsure, **flag — never silently corrupt**.
-Worth adding (realistic clusters, by demand): **clock-TIME tokens** (reformat/keep, the biggest remaining real gap — screenshots/scans), **month-name dates** (Jan / January), **2-digit years**, duplicate `(1)` / `vN` marker stripping.
+- [x] **Month-name dates** (Jan / January, MDY & DMY) → corpus 87→94
+- [x] **Clock-time tokens** (recognize as a unit; reformat layout/separators/seconds, strip AM/PM, compact; NO 12↔24 math) → corpus 94→96
+Still worth adding by demand: **2-digit years**, duplicate `(1)` / `vN` marker stripping. (Out of scope for a one-example engine: arithmetic, Roman numerals, accents, true clock math.)
+
+## SHIPPED v0.1.0
+- [x] `Scripts/build-dmg.sh` → ad-hoc-signed drag-to-Applications `.dmg` ($0, hdiutil, no deps)
+- [x] README install + one-time Gatekeeper "Open Anyway" first-launch flow
+- [x] GitHub Release **v0.1.0** with the `.dmg` (private repo; flip repo + release public at launch)
+- [ ] At launch: make repo public, one-page landing site (domain + VPS), Show HN / r/macapps, awesome-mac PR, Homebrew formula
 
 ## Brand & navigation
 - [x] **Sprig** — Renamr's mascot, a cheerful sprout drawn in vectors (`Mascot.swift`), with idle/happy/thinking moods; present in the header (reacts to state) + empty state + disagreement prompt.
