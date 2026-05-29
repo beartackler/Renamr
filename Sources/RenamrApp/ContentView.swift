@@ -25,7 +25,7 @@ struct ContentView: View {
         HStack(spacing: 8) {
             Image(systemName: "wand.and.stars").foregroundStyle(.tint)
             Text("Renamr").font(.headline)
-            Text("rename by example").font(.caption).foregroundStyle(.secondary)
+            Text(Voice.tagline).font(.caption).foregroundStyle(.secondary)
             if model.hasFolder {
                 Button { model.chooseFolder() } label: { Image(systemName: "folder") }
                     .buttonStyle(.borderless).help("Open a different folder")
@@ -41,15 +41,15 @@ struct ContentView: View {
     private var emptyState: some View {
         VStack(spacing: 14) {
             Image(systemName: "wand.and.stars").font(.system(size: 50)).foregroundStyle(.tint.opacity(0.85))
-            Text("Show me one. I'll do the rest.").font(.title3.weight(.medium))
-            Text("Fix a single filename — Renamr spots the pattern and renames the whole folder.")
+            Text(Voice.emptyTitle).font(.title3.weight(.medium))
+            Text(Voice.emptySubtitle)
                 .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
             HStack(spacing: 10) {
                 Button("Open Folder…") { model.chooseFolder() }.controlSize(.large)
                 Button("Use Frontmost Finder Folder") { model.openFrontmostFinderFolder() }.controlSize(.large)
             }
             .padding(.top, 4)
-            Label("Tip: right-click files in Finder ▸ Rename by Example", systemImage: "contextualmenu.and.cursorarrow")
+            Label(Voice.finderTip, systemImage: "contextualmenu.and.cursorarrow")
                 .font(.caption).foregroundStyle(.tertiary).padding(.top, 6)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -99,7 +99,7 @@ struct ContentView: View {
     private var rightPane: some View {
         VStack(alignment: .leading, spacing: 10) {
             if model.selectedFile != nil {
-                Text(model.examples.count >= 1 ? "Fix another, if I got one wrong" : "Rename this one — I'll learn the pattern")
+                Text(model.examples.count >= 1 ? Voice.teachHeaderMore : Voice.teachHeaderFirst)
                     .font(.headline)
                 TextField("corrected name", text: $model.correctedName)
                     .textFieldStyle(.roundedBorder)
@@ -107,8 +107,7 @@ struct ContentView: View {
                     .onChange(of: model.correctedName) { _ in model.recompute() }
                     .onSubmit { model.recompute() }
             } else {
-                Text("Pick a file on the left, then type what it should be called.")
-                    .foregroundStyle(.secondary)
+                Text(Voice.pickPrompt).foregroundStyle(.secondary)
             }
 
             if let prompt = model.needsMoreInfo { disagreementBanner(prompt) }
@@ -125,6 +124,10 @@ struct ContentView: View {
                 }
             }
             previewList
+            if model.flaggedCount > 0 {
+                Label(Voice.safety, systemImage: "lock.shield")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
         }
         .padding(12)
     }
@@ -133,7 +136,7 @@ struct ContentView: View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: "questionmark.bubble").foregroundStyle(.orange)
             VStack(alignment: .leading, spacing: 3) {
-                Text("Two ways to read that.").font(.callout.weight(.medium))
+                Text(Voice.ambiguityTitle).font(.callout.weight(.medium))
                 Text("For “\(prompt.file)”, did you mean " + prompt.options.prefix(2).map { "“\($0)”" }.joined(separator: " or ") + "?")
                     .font(.caption).foregroundStyle(.secondary)
             }

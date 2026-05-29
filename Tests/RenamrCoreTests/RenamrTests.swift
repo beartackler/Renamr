@@ -88,6 +88,16 @@ final class RenamrTests: XCTestCase {
         XCTAssertEqual(result.previews.map(\.proposed), ["2021.csv", "2023.csv", "1990.csv"])
     }
 
+    // Lowercasing a name including its extension generalizes per-file: each file
+    // keeps its OWN extension, just re-cased (.PNG -> .png), never forced to .jpg.
+    func testExtensionCaseNormalization() {
+        let out = run(
+            example: ("PHOTO.JPG", "photo.jpg"),
+            files: ["PHOTO.JPG", "SHOT.PNG", "clip.MP4"]
+        )
+        XCTAssertEqual(out, ["photo.jpg", "shot.png", "clip.mp4"])
+    }
+
     // Tokenizer: a date is one token; an alpha-prefixed counter splits in two.
     func testTokenization() {
         let tokens = Tokenizer.tokenize("IMG_20240115_beach_DSC0931")

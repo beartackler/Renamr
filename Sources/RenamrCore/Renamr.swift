@@ -119,6 +119,7 @@ public enum Renamr {
         switch program.ext {
         case .keepOriginal: if !ext.isEmpty { out += "." + ext }
         case .constant(let e): if !e.isEmpty { out += "." + e }
+        case .transformCase(let t): if !ext.isEmpty { out += "." + t.apply(ext) }
         }
         return (out, resolved)
     }
@@ -145,7 +146,7 @@ public enum Renamr {
             perToken.append(tier.isEmpty ? [.literal(out.text)] : tier)
         }
 
-        let extPolicy: ExtensionPolicy = (beforeExt == afterExt) ? .keepOriginal : .constant(afterExt)
+        let extPolicy = extensionPolicy(from: beforeExt, to: afterExt)
         let primary = perToken.map { $0[0] }
         var programs: [[Instruction]] = [primary]
         for (index, choices) in perToken.enumerated() where choices.count > 1 {
@@ -212,6 +213,19 @@ public enum Renamr {
     }
 
     // MARK: - Helpers
+
+    /// Same extension, different case (PHOTO.JPG -> photo.jpg) → re-case each
+    /// file's own extension rather than forcing a constant (which would wrongly
+    /// turn a .png into a .jpg). A genuine change/addition stays constant.
+    private static func extensionPolicy(from before: String, to after: String) -> ExtensionPolicy {
+        if before == after { return .keepOriginal }
+        if before.lowercased() == after.lowercased() {
+            for transform in [CaseTransform.lower, .upper, .capitalizeFirst] where transform.apply(before) == after {
+                return .transformCase(transform)
+            }
+        }
+        return .constant(after)
+    }
 
     private static func uniqued(_ instructions: [Instruction]) -> [Instruction] {
         var result: [Instruction] = []

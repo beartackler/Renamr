@@ -25,17 +25,17 @@ targets:
         product: RenamrCore
       - target: RenamrFinderExtension
         embed: true
-    info:
-      path: XcodeSupport/RenamrApp-Info.plist
     settings:
       base:
+        INFOPLIST_FILE: XcodeSupport/RenamrApp-Info.plist
+        GENERATE_INFOPLIST_FILE: NO
         PRODUCT_BUNDLE_IDENTIFIER: app.renamr.Renamr
         PRODUCT_NAME: Renamr
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"
         ENABLE_HARDENED_RUNTIME: YES
-        # Ad-hoc for local builds; swap to "Developer ID Application" + a team to
-        # distribute (the Finder extension needs that to load for end users).
+        # Ad-hoc for local/$0 builds; swap to "Developer ID Application" + a team
+        # to distribute (the Finder extension needs that to load for end users).
         CODE_SIGN_IDENTITY: "-"
         CODE_SIGN_STYLE: Manual
 
@@ -46,10 +46,10 @@ targets:
       - FinderExtension
     dependencies:
       - sdk: FinderSync.framework
-    info:
-      path: XcodeSupport/RenamrFinder-Info.plist
     settings:
       base:
+        INFOPLIST_FILE: XcodeSupport/RenamrFinder-Info.plist
+        GENERATE_INFOPLIST_FILE: NO
         PRODUCT_BUNDLE_IDENTIFIER: app.renamr.Renamr.FinderExtension
         PRODUCT_NAME: RenamrFinderExtension
         MARKETING_VERSION: "0.1.0"

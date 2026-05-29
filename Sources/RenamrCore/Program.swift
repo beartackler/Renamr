@@ -37,8 +37,9 @@ public enum Instruction: Equatable, Sendable {
 }
 
 public enum ExtensionPolicy: Equatable, Sendable {
-    case keepOriginal
-    case constant(String)
+    case keepOriginal                 // leave each file's extension untouched
+    case constant(String)             // force a specific extension
+    case transformCase(CaseTransform) // re-case each file's own extension (PNG -> png)
 }
 
 public struct Program: Equatable, Sendable {

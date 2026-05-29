@@ -110,9 +110,7 @@ final class RenameModel: ObservableObject {
         previews = identityPreviews()
         warnings = []
         needsMoreInfo = nil
-        statusMessage = files.isEmpty
-            ? "This folder's empty. Nothing for me to do here."
-            : "\(files.count) files. Rename one — I'll handle the rest."
+        statusMessage = Voice.loaded(files.count)
         if selectedFile != nil { recompute() }
     }
 
@@ -188,7 +186,7 @@ final class RenameModel: ObservableObject {
         selectedFile = nil
         correctedName = ""
         lastBatch = done
-        statusMessage = personalityForApply(done.count, skipped: skipped)
+        statusMessage = Voice.applied(done.count, skipped: skipped)
     }
 
     func undo() {
@@ -199,7 +197,7 @@ final class RenameModel: ObservableObject {
         }
         lastBatch = []
         if let dir = directoryURL { reload(dir) }
-        statusMessage = reverted > 0 ? "Put \(reverted) back. No harm done." : "Nothing to undo."
+        statusMessage = Voice.undone(reverted)
     }
 
     func startOver() {
@@ -209,7 +207,7 @@ final class RenameModel: ObservableObject {
         previews = identityPreviews()
         warnings = []
         needsMoreInfo = nil
-        statusMessage = "Clean slate. Rename one to begin."
+        statusMessage = Voice.startedOver
     }
 
     // MARK: - Helpers
@@ -225,12 +223,6 @@ final class RenameModel: ObservableObject {
         files.map { RenamePreview(original: $0, proposed: $0, isConfident: false, note: nil) }
     }
 
-    private func personalityForApply(_ count: Int, skipped: Int) -> String {
-        let tail = skipped > 0 ? " (skipped \(skipped) — name clash)" : ""
-        switch count {
-        case 0: return "Nothing changed." + tail
-        case 1: return "Renamed 1. Tidy." + tail
-        default: return "Renamed \(count). Look at that.\(tail)"
-        }
-    }
+    /// How many previews are flagged (uncertain) — drives the safety footnote.
+    var flaggedCount: Int { previews.filter { !$0.isConfident }.count }
 }
