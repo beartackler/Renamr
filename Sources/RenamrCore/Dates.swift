@@ -28,13 +28,14 @@ public enum DateFormatSig: String, CaseIterable, Sendable {
     /// longer numeric run (e.g. a 10-digit serial or a counter).
     var regexPattern: String {
         switch self {
+        // Year stays 4 digits; month/day allow 1–2 so 2024-1-5 parses like 2024-01-05.
         case .compact:       return "(?<![0-9])([0-9]{4})([0-9]{2})([0-9]{2})(?![0-9])"
-        case .dashYMD:       return "([0-9]{4})-([0-9]{2})-([0-9]{2})"
-        case .slashYMD:      return "([0-9]{4})/([0-9]{2})/([0-9]{2})"
-        case .dotYMD:        return "([0-9]{4})\\.([0-9]{2})\\.([0-9]{2})"
-        case .underscoreYMD: return "([0-9]{4})_([0-9]{2})_([0-9]{2})"
-        case .slashMDY:      return "([0-9]{2})/([0-9]{2})/([0-9]{4})"
-        case .dashDMY:       return "([0-9]{2})-([0-9]{2})-([0-9]{4})"
+        case .dashYMD:       return "([0-9]{4})-([0-9]{1,2})-([0-9]{1,2})"
+        case .slashYMD:      return "([0-9]{4})/([0-9]{1,2})/([0-9]{1,2})"
+        case .dotYMD:        return "([0-9]{4})\\.([0-9]{1,2})\\.([0-9]{1,2})"
+        case .underscoreYMD: return "([0-9]{4})_([0-9]{1,2})_([0-9]{1,2})"
+        case .slashMDY:      return "([0-9]{1,2})/([0-9]{1,2})/([0-9]{4})"
+        case .dashDMY:       return "([0-9]{1,2})-([0-9]{1,2})-([0-9]{4})"
         }
     }
 

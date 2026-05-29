@@ -163,6 +163,15 @@ final class RenamrTests: XCTestCase {
         XCTAssertEqual(out, ["01 Get Lucky.mp3", "02 Instant Crush.mp3", "03 Doin it Right.mp3"])
     }
 
+    // Single-digit date parts parse and pad: 2024-1-5 -> 2024-01-05.
+    func testFlexibleDateWidths() {
+        let out = run(
+            example: ("2024-1-5.txt", "2024-01-05.txt"),
+            files: ["2024-1-5.txt", "2024-12-9.txt", "2024-3-21.txt"]
+        )
+        XCTAssertEqual(out, ["2024-01-05.txt", "2024-12-09.txt", "2024-03-21.txt"])
+    }
+
     // Tokenizer: a date is one token; an alpha-prefixed counter splits in two.
     func testTokenization() {
         let tokens = Tokenizer.tokenize("IMG_20240115_beach_DSC0931")

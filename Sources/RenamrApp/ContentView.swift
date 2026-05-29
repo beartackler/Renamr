@@ -46,51 +46,35 @@ struct ContentView: View {
     // MARK: empty state — compact, centered, teaches at a glance
 
     private var emptyState: some View {
-        VStack(spacing: 18) {
-            Spacer(minLength: 0)
-            Mascot(mood: .happy, size: 116)
+        VStack(spacing: 0) {
+            Spacer()
+            Mascot(mood: .idle, size: 104)
+            Text(Voice.emptyTitle)
+                .font(.title2.weight(.semibold))
+                .multilineTextAlignment(.center)
+                .padding(.top, 16)
+            Text(Voice.emptySubtitle)
+                .font(.callout).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: 360)
+                .padding(.top, 6)
 
-            VStack(spacing: 7) {
-                Text(Voice.emptyTitle).font(.system(size: 22, weight: .semibold))
-                Text(Voice.emptySubtitle)
-                    .font(.callout).foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center).frame(maxWidth: 380)
+            Button("Open a Folder…") { model.chooseFolder() }
+                .buttonStyle(.borderedProminent).tint(Brand.green).controlSize(.large)
+                .padding(.top, 22)
+
+            Button { model.openFrontmostFinderFolder() } label: {
+                Label("Use the folder open in Finder", systemImage: "macwindow")
             }
-
-            // Show what it does — three real before → after examples.
-            VStack(spacing: 6) {
-                exampleChip("DSC0931.JPG", "0931.jpg")
-                exampleChip("Screenshot 2026-05-29 at 7.18 PM.png", "2026-05-29 Screenshot.png")
-                exampleChip("01 - Daft Punk - Get Lucky.mp3", "01 Get Lucky.mp3")
-            }
-            .padding(.vertical, 4)
-
-            HStack(spacing: 10) {
-                Button("Open Folder…") { model.chooseFolder() }
-                    .buttonStyle(.borderedProminent).tint(Brand.green).controlSize(.large)
-                Button("Use Finder Folder") { model.openFrontmostFinderFolder() }
-                    .controlSize(.large)
-            }
-
-            Label(Voice.finderTip, systemImage: "contextualmenu.and.cursorarrow")
-                .font(.caption).foregroundStyle(.tertiary)
-            Spacer(minLength: 0)
+            .buttonStyle(.plain).foregroundStyle(Brand.green).font(.callout)
+            .padding(.top, 12)
+            Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.horizontal, 40)
+        .padding(32)
         .background(dropTargeted ? Brand.green.opacity(0.07) : Color.clear)
         .contentShape(Rectangle())
-    }
-
-    private func exampleChip(_ before: String, _ after: String) -> some View {
-        HStack(spacing: 8) {
-            Text(before).foregroundStyle(.secondary).lineLimit(1)
-            Image(systemName: "arrow.right").font(.caption2).foregroundStyle(.tertiary)
-            Text(after).foregroundStyle(Brand.green).lineLimit(1)
-        }
-        .font(.system(size: 11, design: .monospaced))
-        .padding(.horizontal, 11).padding(.vertical, 6)
-        .background(Brand.green.opacity(0.07), in: Capsule())
     }
 
     // MARK: folder view — path bar + folders + inline-editable files
