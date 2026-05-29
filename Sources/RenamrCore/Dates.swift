@@ -26,6 +26,19 @@ public enum DateFormatSig: String, CaseIterable, Sendable {
     case dotDMY           // 15.01.2024  (output formats below; reformat targets)
     case slashDMY         // 15/01/2024
     case dashMDY          // 01-15-2024
+    case dashYYMMDD       // 24-01-15  (2-digit year, expanded via century pivot)
+    case slashYYMMDD      // 24/01/15
+    case dashDDMMYY       // 15-01-24
+    case slashDDMMYY      // 15/01/24
+    case dashMMDDYY       // 01-15-24
+    case slashMMDDYY      // 01/15/24
+
+    var isTwoDigitYear: Bool {
+        switch self {
+        case .dashYYMMDD, .slashYYMMDD, .dashDDMMYY, .slashDDMMYY, .dashMMDDYY, .slashMMDDYY: return true
+        default: return false
+        }
+    }
 
     /// ICU regex. Compact uses digit lookarounds so it never grabs part of a
     /// longer numeric run (e.g. a 10-digit serial or a counter).
@@ -42,6 +55,12 @@ public enum DateFormatSig: String, CaseIterable, Sendable {
         case .dotDMY:        return "([0-9]{1,2})\\.([0-9]{1,2})\\.([0-9]{4})"
         case .slashDMY:      return "([0-9]{1,2})/([0-9]{1,2})/([0-9]{4})"
         case .dashMDY:       return "([0-9]{1,2})-([0-9]{1,2})-([0-9]{4})"
+        case .dashYYMMDD:    return "(?<![0-9])([0-9]{2})-([0-9]{1,2})-([0-9]{1,2})(?![0-9])"
+        case .slashYYMMDD:   return "(?<![0-9])([0-9]{2})/([0-9]{1,2})/([0-9]{1,2})(?![0-9])"
+        case .dashDDMMYY:    return "(?<![0-9])([0-9]{1,2})-([0-9]{1,2})-([0-9]{2})(?![0-9])"
+        case .slashDDMMYY:   return "(?<![0-9])([0-9]{1,2})/([0-9]{1,2})/([0-9]{2})(?![0-9])"
+        case .dashMMDDYY:    return "(?<![0-9])([0-9]{1,2})-([0-9]{1,2})-([0-9]{2})(?![0-9])"
+        case .slashMMDDYY:   return "(?<![0-9])([0-9]{1,2})/([0-9]{1,2})/([0-9]{2})(?![0-9])"
         }
     }
 
@@ -51,11 +70,15 @@ public enum DateFormatSig: String, CaseIterable, Sendable {
         case .compact, .dashYMD, .slashYMD, .dotYMD, .underscoreYMD: return (1, 2, 3)
         case .slashMDY, .dashMDY: return (3, 1, 2)
         case .dashDMY, .dotDMY, .slashDMY: return (3, 2, 1)
+        case .dashYYMMDD, .slashYYMMDD: return (1, 2, 3)
+        case .dashDDMMYY, .slashDDMMYY: return (3, 2, 1)
+        case .dashMMDDYY, .slashMMDDYY: return (3, 1, 2)
         }
     }
 
     public func format(_ d: SimpleDate) -> String {
         let y = String(format: "%04ld", d.year)
+        let yy = String(format: "%02ld", d.year % 100)
         let m = String(format: "%02ld", d.month)
         let day = String(format: "%02ld", d.day)
         switch self {
@@ -69,6 +92,12 @@ public enum DateFormatSig: String, CaseIterable, Sendable {
         case .dotDMY:        return "\(day).\(m).\(y)"
         case .slashDMY:      return "\(day)/\(m)/\(y)"
         case .dashMDY:       return "\(m)-\(day)-\(y)"
+        case .dashYYMMDD:    return "\(yy)-\(m)-\(day)"
+        case .slashYYMMDD:   return "\(yy)/\(m)/\(day)"
+        case .dashDDMMYY:    return "\(day)-\(m)-\(yy)"
+        case .slashDDMMYY:   return "\(day)/\(m)/\(yy)"
+        case .dashMMDDYY:    return "\(m)-\(day)-\(yy)"
+        case .slashMMDDYY:   return "\(m)/\(day)/\(yy)"
         }
     }
 }
@@ -87,6 +116,8 @@ enum DateRecognizer {
         .dashYMD, .slashYMD, .dotYMD, .underscoreYMD,
         .slashMDY, .slashDMY, .dashDMY, .dashMDY, .dotDMY,
         .compact,
+        // 2-digit years last (most ambiguous); validity rejects impossible reads.
+        .dashYYMMDD, .slashYYMMDD, .dashDDMMYY, .slashDDMMYY, .dashMMDDYY, .slashMMDDYY,
     ]
 
     static let monthNumbers: [String: Int] = [
@@ -139,8 +170,10 @@ enum DateRecognizer {
                     let yr = Range(m.range(at: yi), in: s),
                     let mr = Range(m.range(at: mi), in: s),
                     let dr = Range(m.range(at: di), in: s),
-                    let y = Int(s[yr]), let mo = Int(s[mr]), let d = Int(s[dr])
+                    let rawY = Int(s[yr]), let mo = Int(s[mr]), let d = Int(s[dr])
                 else { continue }
+                // Century pivot for 2-digit years: 00–69 → 2000s, 70–99 → 1900s.
+                let y = sig.isTwoDigitYear ? (rawY < 70 ? 2000 + rawY : 1900 + rawY) : rawY
                 let date = SimpleDate(year: y, month: mo, day: d)
                 guard date.isValid else { continue }
                 result.append(DateMatch(range: r, date: date, format: sig, raw: String(s[r])))

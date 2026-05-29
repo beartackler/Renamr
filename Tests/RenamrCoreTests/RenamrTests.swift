@@ -251,6 +251,24 @@ final class RenamrTests: XCTestCase {
         XCTAssertEqual(out, ["2023-11-02 8.15.44.png", "2023-11-02 3.27.10.png", "2023-12-24 6.04.51.png"])
     }
 
+    // 2-digit year (YY-MM-DD) expands via century pivot to a 4-digit ISO date.
+    func testTwoDigitYearDate() {
+        let out = run(
+            example: ("invoice 24-01-15.pdf", "invoice 2024-01-15.pdf"),
+            files: ["invoice 24-01-15.pdf", "invoice 24-03-22.pdf", "invoice 23-11-08.pdf"]
+        )
+        XCTAssertEqual(out, ["invoice 2024-01-15.pdf", "invoice 2024-03-22.pdf", "invoice 2023-11-08.pdf"])
+    }
+
+    // Marker stripping: a trailing " (1)" duplicate marker is dropped.
+    func testDuplicateMarkerStrip() {
+        let out = run(
+            example: ("DSC_0456 (1).JPG", "DSC_0456.JPG"),
+            files: ["DSC_0456 (1).JPG", "DSC_0457 (1).JPG", "DSC_0458 (2).JPG", "DSC_0459.JPG"]
+        )
+        XCTAssertEqual(out, ["DSC_0456.JPG", "DSC_0457.JPG", "DSC_0458.JPG", "DSC_0459.JPG"])
+    }
+
     // Tokenizer: a date is one token; an alpha-prefixed counter splits in two.
     func testTokenization() {
         let tokens = Tokenizer.tokenize("IMG_20240115_beach_DSC0931")
@@ -258,4 +276,6 @@ final class RenamrTests: XCTestCase {
         XCTAssertEqual(tokens.filter { $0.kind == .word }.map(\.text), ["IMG", "beach", "DSC"])
         XCTAssertEqual(tokens.filter { $0.kind == .number }.map(\.text), ["0931"])
     }
+
+
 }

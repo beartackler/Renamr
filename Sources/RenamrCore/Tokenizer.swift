@@ -43,6 +43,9 @@ public enum Tokenizer {
     /// Dates are recognized first and carved out as single tokens; the gaps
     /// between them are split on letter/digit/separator class transitions.
     public static func tokenize(_ stem: String) -> [Token] {
+        // Dates first (they're more common than dashed times, and 2-digit dashed
+        // dates like 23-11-08 would otherwise be mis-read as 23:11:08). Dotted and
+        // colon times are unambiguous and still get carved within the gaps.
         let dates = DateRecognizer.matches(in: stem)
         var tokens: [Token] = []
         var cursor = stem.startIndex

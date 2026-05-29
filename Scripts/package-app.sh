@@ -13,7 +13,7 @@ cd "$(dirname "$0")/.."
 APP_NAME="Renamr"
 EXECUTABLE="RenamrApp"
 BUNDLE_ID="app.renamr.Renamr"
-VERSION="0.1.0"
+VERSION="0.1.1"
 BUILD_NUMBER="1"
 MIN_MACOS="13.0"
 

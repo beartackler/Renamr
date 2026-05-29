@@ -1,13 +1,20 @@
-# Renamr
+# 🌱 Renamr
 
-**Rename a whole folder by example.** Correct *one* filename, hit enter, and every other file transforms by the same inferred logic — date reformatting, field reordering, dropped tokens, re-casing, renumbering, and all. No regex, no field chips, no template language.
+### [⬇️ Download Renamr for macOS](https://github.com/beartackler/Renamr/releases/latest)
 
-It's [FlashFill](https://en.wikipedia.org/wiki/Programming_by_example)'s interaction applied to filenames — a domain spreadsheets can't reach, and one no native Mac app currently does.
+[![Download the latest .dmg](https://img.shields.io/github/v/release/beartackler/Renamr?label=Download%20.dmg&style=for-the-badge&color=2ea043&logo=apple)](https://github.com/beartackler/Renamr/releases/latest)
+![macOS 13+](https://img.shields.io/badge/macOS-13%2B-blue) ![License MIT](https://img.shields.io/badge/license-MIT-green) ![100% local](https://img.shields.io/badge/100%25-local-success)
+
+**Rename a whole folder by example.** Correct *one* filename, hit enter, and every other file transforms by the same inferred logic — date reformatting, field reordering, dropped tokens, re-casing, renumbering, and all. No regex, no field chips, no template language. Free, open source, and **100% on your Mac**.
+
+It's [FlashFill](https://en.wikipedia.org/wiki/Programming_by_example)'s interaction applied to filenames — a domain spreadsheets can't reach.
 
 ```
-IMG_20240115_vacation_beach_DSC0931.jpg   →   2024-01-15 Beach 0931.jpg
-IMG_20240116_trip_sunset_DSC0942.jpg      →   2024-01-16 Sunset 0942.jpg   ← you typed nothing here
-IMG_20240117_party_night_DSC1003.jpg      →   2024-01-17 Night 1003.jpg    ← or here
+DSC0931.JPG                                  →   Beach 1.jpg          (rename one…
+DSC0942.JPG                                  →   Beach 2.jpg           …the rest follow)
+PXL_20240115_103045.jpg                      →   2024-01-15.jpg
+Screenshot 2026-05-29 at 7.18.42 PM.png      →   2026-05-29 Screenshot.png
+01 - Daft Punk - Get Lucky.mp3               →   01 Get Lucky.mp3
 ```
 
 You demonstrate the result once. Renamr infers the rule and previews it across the folder.
