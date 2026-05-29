@@ -23,6 +23,9 @@ public enum DateFormatSig: String, CaseIterable, Sendable {
     case underscoreYMD    // 2024_01_15
     case slashMDY         // 01/15/2024
     case dashDMY          // 15-01-2024
+    case dotDMY           // 15.01.2024  (output formats below; reformat targets)
+    case slashDMY         // 15/01/2024
+    case dashMDY          // 01-15-2024
 
     /// ICU regex. Compact uses digit lookarounds so it never grabs part of a
     /// longer numeric run (e.g. a 10-digit serial or a counter).
@@ -36,6 +39,9 @@ public enum DateFormatSig: String, CaseIterable, Sendable {
         case .underscoreYMD: return "([0-9]{4})_([0-9]{1,2})_([0-9]{1,2})"
         case .slashMDY:      return "([0-9]{1,2})/([0-9]{1,2})/([0-9]{4})"
         case .dashDMY:       return "([0-9]{1,2})-([0-9]{1,2})-([0-9]{4})"
+        case .dotDMY:        return "([0-9]{1,2})\\.([0-9]{1,2})\\.([0-9]{4})"
+        case .slashDMY:      return "([0-9]{1,2})/([0-9]{1,2})/([0-9]{4})"
+        case .dashMDY:       return "([0-9]{1,2})-([0-9]{1,2})-([0-9]{4})"
         }
     }
 
@@ -43,8 +49,8 @@ public enum DateFormatSig: String, CaseIterable, Sendable {
     var groupOrder: (y: Int, m: Int, d: Int) {
         switch self {
         case .compact, .dashYMD, .slashYMD, .dotYMD, .underscoreYMD: return (1, 2, 3)
-        case .slashMDY: return (3, 1, 2)
-        case .dashDMY:  return (3, 2, 1)
+        case .slashMDY, .dashMDY: return (3, 1, 2)
+        case .dashDMY, .dotDMY, .slashDMY: return (3, 2, 1)
         }
     }
 
@@ -60,6 +66,9 @@ public enum DateFormatSig: String, CaseIterable, Sendable {
         case .underscoreYMD: return "\(y)_\(m)_\(day)"
         case .slashMDY:      return "\(m)/\(day)/\(y)"
         case .dashDMY:       return "\(day)-\(m)-\(y)"
+        case .dotDMY:        return "\(day).\(m).\(y)"
+        case .slashDMY:      return "\(day)/\(m)/\(y)"
+        case .dashMDY:       return "\(m)-\(day)-\(y)"
         }
     }
 }
@@ -75,7 +84,9 @@ enum DateRecognizer {
     /// Tried most-specific / least-ambiguous first so `2024-01-15` is read as
     /// dashYMD, and the bare 8-digit compact form is the last resort.
     static let priority: [DateFormatSig] = [
-        .dashYMD, .slashYMD, .dotYMD, .underscoreYMD, .slashMDY, .dashDMY, .compact,
+        .dashYMD, .slashYMD, .dotYMD, .underscoreYMD,
+        .slashMDY, .slashDMY, .dashDMY, .dashMDY, .dotDMY,
+        .compact,
     ]
 
     static func matches(in s: String) -> [DateMatch] {

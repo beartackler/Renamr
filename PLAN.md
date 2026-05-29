@@ -38,7 +38,14 @@ The moat is **execution quality**, not idea novelty (StringSolver proves the int
 - [x] **Variable-length fields** — `copyRest` collapses a trailing run of word-copies that reaches the last word into "keep the rest", so song/movie/episode titles of any length generalize. Tested (15/15).
 - [x] Flexible-width date parts (2024-1-5 → 2024-01-05)
 - [x] **Sequential renumbering** — when the output number isn't in the filename, renumber 1,2,3… by file position (camera dumps: DSC0931.JPG → Beach 1.jpg). Keeping the original counter still uses copy.
-- [ ] Full version-space algebra for compound ambiguity; time tokens (screenshot times); date-locale (01/02) resolution
+- [x] **Global separator/case normalize** (`a_b_c → a-b-c`, slug → Title Case) — generalizes across any structure
+- [x] **Sequence fail-safe** — no longer invents a 1,2,3 sequence from a chunk extracted out of a longer number (was corrupting); flags instead
+- [x] **More date output layouts** (dotted/slashed day-first/month-first; validity disambiguates)
+- [x] **Corpus benchmark** — `Tests/Fixtures/corpus-benchmark.json` (160 realistic + adversarial scenarios) run by `swift run renamr-corpus <file>`; currently **87/160** pass (don't let it regress).
+
+### Honest engine ceiling (a one-example PBE engine can't do "everything")
+The corpus is deliberately adversarial. The realistic, inferable cases mostly pass; the long tail that remains is either **fundamentally un-inferable from a single example** (arithmetic offsets like +100, Roman→Arabic, accent-stripping, true 12h↔24h clock math, CamelCase splitting, thousands-commas) or **needs 2 examples** (locale-ambiguous dates). The safety principle holds: when unsure, **flag — never silently corrupt**.
+Worth adding (realistic clusters, by demand): **clock-TIME tokens** (reformat/keep, the biggest remaining real gap — screenshots/scans), **month-name dates** (Jan / January), **2-digit years**, duplicate `(1)` / `vN` marker stripping.
 
 ## Brand & navigation
 - [x] **Sprig** — Renamr's mascot, a cheerful sprout drawn in vectors (`Mascot.swift`), with idle/happy/thinking moods; present in the header (reacts to state) + empty state + disagreement prompt.

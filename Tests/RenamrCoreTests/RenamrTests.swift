@@ -191,6 +191,44 @@ final class RenamrTests: XCTestCase {
         XCTAssertEqual(out, ["0931.jpg", "0942.jpg"])
     }
 
+    // Global separator remap generalizes across any structure (underscores → hyphens).
+    func testSeparatorNormalize() {
+        let out = run(
+            example: ("invoice_2023_final_v2.pdf", "invoice-2023-final-v2.pdf"),
+            files: ["invoice_2023_final_v2.pdf", "receipt_march_scan.pdf", "tax_return_2022.pdf"]
+        )
+        XCTAssertEqual(out, ["invoice-2023-final-v2.pdf", "receipt-march-scan.pdf", "tax-return-2022.pdf"])
+    }
+
+    // Slug → Title Case: hyphens to spaces + capitalize each word, any length.
+    func testSlugToTitleCase() {
+        let out = run(
+            example: ("the-best-pasta-recipe.html", "The Best Pasta Recipe.html"),
+            files: ["the-best-pasta-recipe.html", "how-to-fix-a-sink.html", "ten-sleep-tips.html"]
+        )
+        XCTAssertEqual(out, ["The Best Pasta Recipe.html", "How To Fix A Sink.html", "Ten Sleep Tips.html"])
+    }
+
+    // Reformat ISO date to a dotted day-first layout.
+    func testDottedDateOutput() {
+        let out = run(
+            example: ("log 2024-01-05.txt", "log 05.01.2024.txt"),
+            files: ["log 2024-01-05.txt", "log 2024-12-31.txt"]
+        )
+        XCTAssertEqual(out, ["log 05.01.2024.txt", "log 31.12.2024.txt"])
+    }
+
+    // Sequence must NOT fire on a chunk extracted from a longer number (fail safe).
+    func testNoFakeSequenceOnExtraction() {
+        let result = Renamr.synthesize(
+            examples: [("20240115_report.txt", "0115_report.txt")],
+            files: ["20240115_report.txt", "20240220_report.txt"]
+        )
+        // We can't extract a middle chunk from one example, so it must NOT invent
+        // a 0115,0116 sequence — the second file should be flagged, not corrupted.
+        XCTAssertNotEqual(result.previews.map(\.proposed), ["0115_report.txt", "0116_report.txt"])
+    }
+
     // Tokenizer: a date is one token; an alpha-prefixed counter splits in two.
     func testTokenization() {
         let tokens = Tokenizer.tokenize("IMG_20240115_beach_DSC0931")

@@ -128,6 +128,14 @@ public enum Renamr {
                 if let token = lookup(ref, in: byKind), let value = token.intValue { out += formatNumber(value, pad: padWidth) } else { resolved = false }
             case .sequence(let start, let step, let padWidth):
                 out += formatNumber(start + index * step, pad: padWidth)
+            case .normalize(let separator, let transform):
+                for token in Tokenizer.tokenize(stem) {
+                    switch token.kind {
+                    case .separator: out += separator
+                    case .word: out += transform.apply(token.text)
+                    default: out += token.text
+                    }
+                }
             }
         }
 
@@ -149,6 +157,14 @@ public enum Renamr {
     static func candidatePrograms(before: String, after: String, exampleIndex: Int = 0) -> [Program] {
         let (beforeStem, beforeExt) = splitName(before)
         let (afterStem, afterExt) = splitName(after)
+
+        // Whole-name separator/case remap (slug → Title Case, _ → -, dots → spaces)
+        // generalizes across any structure, so it's its own program when it fits.
+        if let normalize = detectNormalize(beforeStem: beforeStem, afterStem: afterStem,
+                                           ext: extensionPolicy(from: beforeExt, to: afterExt)) {
+            return [normalize]
+        }
+
         let byKind = indexByKind(Tokenizer.tokenize(beforeStem))
         let outputTokens = Tokenizer.tokenize(afterStem)
 
@@ -250,8 +266,15 @@ public enum Renamr {
         // A number with no source in the filename → likely a fresh 1,2,3… sequence
         // by file position (the classic camera dump). Cheaper than a literal,
         // dearer than copying a real source number, so it only wins for orphans.
+        // BUT skip it when the number looks EXTRACTED from a longer number (e.g.
+        // 0115 out of 20240115) — that's not a sequence, and guessing one corrupts.
         if out.kind == .number, let value = Int(out.text) {
-            candidates.append((.sequence(start: value - exampleIndex, step: 1, padWidth: out.text.count), 6))
+            let looksExtracted = out.text.count >= 2 && byKind.values.flatMap { $0 }.contains {
+                $0.text.count > out.text.count && $0.text.contains(out.text)
+            }
+            if !looksExtracted {
+                candidates.append((.sequence(start: value - exampleIndex, step: 1, padWidth: out.text.count), 6))
+            }
         }
 
         candidates.append((.literal(out.text), out.kind == .separator ? 1 : 12))
@@ -292,6 +315,46 @@ public enum Renamr {
         return .constant(after)
     }
 
+    /// The case transform mapping `from` → `to`, or nil if none does.
+    private static func caseTransformBetween(_ from: String, _ to: String) -> CaseTransform? {
+        for t in [CaseTransform.identity, .lower, .upper, .capitalizeFirst] where t.apply(from) == to { return t }
+        return nil
+    }
+
+    /// Detect a pure separator-remap + uniform word re-casing (same token structure,
+    /// only separators and letter-case change) — e.g. "a_b_c" → "a-b-c", or
+    /// "the-best-recipe" → "The Best Recipe". Returns a `.normalize` program if so.
+    private static func detectNormalize(beforeStem: String, afterStem: String, ext: ExtensionPolicy) -> Program? {
+        let before = Tokenizer.tokenize(beforeStem)
+        let after = Tokenizer.tokenize(afterStem)
+        guard before.count == after.count, before.count >= 2 else { return nil }
+
+        var transform: CaseTransform?
+        var targetSeparator: String?
+        var separatorChanged = false
+
+        for (b, a) in zip(before, after) {
+            guard b.kind == a.kind else { return nil }   // structure must match exactly
+            switch b.kind {
+            case .separator:
+                if let t = targetSeparator { if t != a.text { return nil } } else { targetSeparator = a.text }
+                if a.text != b.text { separatorChanged = true }
+            case .word:
+                guard let t = caseTransformBetween(b.text, a.text) else { return nil }
+                if t != .identity {
+                    if let existing = transform, existing != t { return nil }
+                    transform = t
+                }
+            default:
+                guard b.text == a.text else { return nil }   // numbers/dates must be identical
+            }
+        }
+
+        let caseT = transform ?? .identity
+        guard separatorChanged || caseT != .identity else { return nil }   // must actually change something
+        return Program(instructions: [.normalize(separator: targetSeparator ?? "", transform: caseT)], ext: ext)
+    }
+
     private static func uniqued(_ instructions: [Instruction]) -> [Instruction] {
         var result: [Instruction] = []
         for instruction in instructions where !result.contains(instruction) { result.append(instruction) }
@@ -306,6 +369,7 @@ public enum Renamr {
         case .dateReformat(let r, _): return r.ordinal
         case .number(let r, _): return r.ordinal
         case .sequence: return Int.max - 1
+        case .normalize: return Int.max
         case .literal: return Int.max
         }
     }
