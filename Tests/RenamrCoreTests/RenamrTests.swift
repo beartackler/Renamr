@@ -172,6 +172,25 @@ final class RenamrTests: XCTestCase {
         XCTAssertEqual(out, ["2024-01-05.txt", "2024-12-09.txt", "2024-03-21.txt"])
     }
 
+    // Camera dump → sequential renumbering: the "1" isn't in DSC0931, so it's a
+    // fresh 1,2,3… by position. (Keeping the original counter still uses copy.)
+    func testSequentialRenumber() {
+        let out = run(
+            example: ("DSC0931.JPG", "Beach 1.jpg"),
+            files: ["DSC0931.JPG", "DSC0942.JPG", "DSC1003.JPG", "DSC1188.JPG"]
+        )
+        XCTAssertEqual(out, ["Beach 1.jpg", "Beach 2.jpg", "Beach 3.jpg", "Beach 4.jpg"])
+    }
+
+    // The same camera files, but keeping the original counter, still strips+lowercases.
+    func testKeepCounterStillWorks() {
+        let out = run(
+            example: ("DSC0931.JPG", "0931.jpg"),
+            files: ["DSC0931.JPG", "DSC0942.JPG"]
+        )
+        XCTAssertEqual(out, ["0931.jpg", "0942.jpg"])
+    }
+
     // Tokenizer: a date is one token; an alpha-prefixed counter splits in two.
     func testTokenization() {
         let tokens = Tokenizer.tokenize("IMG_20240115_beach_DSC0931")

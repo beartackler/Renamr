@@ -36,6 +36,8 @@ The moat is **execution quality**, not idea novelty (StringSolver proves the int
 - [x] Prefix/abbreviation extraction (January → Jan, generalizes to Feb/Mar)
 - [x] **Realistic-filename test coverage** — screenshots, Pixel, DSLR strip+counter, trip-label+counter (14 tests). Proven on names people actually have.
 - [x] **Variable-length fields** — `copyRest` collapses a trailing run of word-copies that reaches the last word into "keep the rest", so song/movie/episode titles of any length generalize. Tested (15/15).
+- [x] Flexible-width date parts (2024-1-5 → 2024-01-05)
+- [x] **Sequential renumbering** — when the output number isn't in the filename, renumber 1,2,3… by file position (camera dumps: DSC0931.JPG → Beach 1.jpg). Keeping the original counter still uses copy.
 - [ ] Full version-space algebra for compound ambiguity; time tokens (screenshot times); date-locale (01/02) resolution
 
 ## Brand & navigation

@@ -63,12 +63,8 @@ struct ContentView: View {
             Button("Open a Folder…") { model.chooseFolder() }
                 .buttonStyle(.borderedProminent).tint(Brand.green).controlSize(.large)
                 .padding(.top, 22)
-
-            Button { model.openFrontmostFinderFolder() } label: {
-                Label("Use the folder open in Finder", systemImage: "macwindow")
-            }
-            .buttonStyle(.plain).foregroundStyle(Brand.green).font(.callout)
-            .padding(.top, 12)
+            Text("…or drop a folder anywhere in this window")
+                .font(.caption).foregroundStyle(.tertiary).padding(.top, 10)
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

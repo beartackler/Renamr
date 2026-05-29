@@ -63,9 +63,12 @@ public enum Renamr {
         // Build the competing programs implied by the first example (primary +
         // one variant per ambiguous field), then keep only those consistent with
         // every example given. Extra examples collapse the ambiguity.
-        let candidates = candidatePrograms(before: first.before, after: first.after)
+        let candidates = candidatePrograms(before: first.before, after: first.after,
+                                           exampleIndex: files.firstIndex(of: first.before) ?? 0)
         let consistent = candidates.filter { program in
-            examples.allSatisfy { apply(program: program, to: $0.before).proposed == $0.after }
+            examples.allSatisfy { example in
+                apply(program: program, to: example.before, index: files.firstIndex(of: example.before) ?? 0).proposed == example.after
+            }
         }
         var warnings: [String] = []
         let alive: [Program]
@@ -77,8 +80,8 @@ public enum Renamr {
         }
 
         let best = alive[0]   // all alive programs tie on the examples; primary is first
-        let previews = files.map { file -> RenamePreview in
-            let result = apply(program: best, to: file)
+        let previews = files.enumerated().map { (index, file) -> RenamePreview in
+            let result = apply(program: best, to: file, index: index)
             if let proposed = result.proposed, result.resolved {
                 return RenamePreview(original: file, proposed: proposed, isConfident: true, note: nil)
             }
@@ -96,8 +99,9 @@ public enum Renamr {
         return SynthesisResult(program: best, previews: previews, warnings: warnings, needsMoreInfo: needsMoreInfo)
     }
 
-    /// Apply a learned program to a single filename.
-    public static func apply(program: Program, to filename: String) -> (proposed: String?, resolved: Bool) {
+    /// Apply a learned program to a single filename. `index` is the file's
+    /// position in the folder, used only by `.sequence` (renumbering).
+    public static func apply(program: Program, to filename: String, index: Int = 0) -> (proposed: String?, resolved: Bool) {
         let (stem, ext) = splitName(filename)
         let byKind = indexByKind(Tokenizer.tokenize(stem))
         var out = ""
@@ -122,6 +126,8 @@ public enum Renamr {
                 if let token = lookup(ref, in: byKind), let date = token.date { out += format.format(date) } else { resolved = false }
             case .number(let ref, let padWidth):
                 if let token = lookup(ref, in: byKind), let value = token.intValue { out += formatNumber(value, pad: padWidth) } else { resolved = false }
+            case .sequence(let start, let step, let padWidth):
+                out += formatNumber(start + index * step, pad: padWidth)
             }
         }
 
@@ -140,7 +146,7 @@ public enum Renamr {
     /// cost), one variant that flips just that token. Single-flip variants are
     /// enough to detect "which field did you mean?" disagreements while staying
     /// bounded — no combinatorial blow-up.
-    static func candidatePrograms(before: String, after: String) -> [Program] {
+    static func candidatePrograms(before: String, after: String, exampleIndex: Int = 0) -> [Program] {
         let (beforeStem, beforeExt) = splitName(before)
         let (afterStem, afterExt) = splitName(after)
         let byKind = indexByKind(Tokenizer.tokenize(beforeStem))
@@ -148,7 +154,7 @@ public enum Renamr {
 
         var perToken: [[Instruction]] = []
         for out in outputTokens {
-            let cands = explanations(for: out, byKind: byKind)
+            let cands = explanations(for: out, byKind: byKind, exampleIndex: exampleIndex)
             let minCost = cands.map(\.1).min() ?? 12
             var tier = uniqued(cands.filter { $0.1 == minCost }.map(\.0))
             tier.sort { refOrdinal($0) < refOrdinal($1) }
@@ -206,7 +212,7 @@ public enum Renamr {
     /// Every way an input token could explain one output token, with a cost.
     /// The simplicity prior: copying/transforming real data is cheap, hard-coding
     /// a data-looking literal is expensive, separators-as-literals are cheap.
-    private static func explanations(for out: Token, byKind: [TokenKind: [Token]]) -> [(Instruction, Int)] {
+    private static func explanations(for out: Token, byKind: [TokenKind: [Token]], exampleIndex: Int) -> [(Instruction, Int)] {
         var candidates: [(Instruction, Int)] = []
         for (kind, tokens) in byKind {
             if kind == .separator { continue }   // never reference separators; they become literals
@@ -241,6 +247,13 @@ public enum Renamr {
                 }
             }
         }
+        // A number with no source in the filename → likely a fresh 1,2,3… sequence
+        // by file position (the classic camera dump). Cheaper than a literal,
+        // dearer than copying a real source number, so it only wins for orphans.
+        if out.kind == .number, let value = Int(out.text) {
+            candidates.append((.sequence(start: value - exampleIndex, step: 1, padWidth: out.text.count), 6))
+        }
+
         candidates.append((.literal(out.text), out.kind == .separator ? 1 : 12))
         return candidates
     }
@@ -251,8 +264,8 @@ public enum Renamr {
         guard programs.count > 1 else { return nil }
         var bestFile: String?
         var bestOptions: [String] = []
-        for file in files {
-            let outcomes = programs.map { apply(program: $0, to: file) }
+        for (index, file) in files.enumerated() {
+            let outcomes = programs.map { apply(program: $0, to: file, index: index) }
             guard outcomes.allSatisfy(\.resolved) else { continue }
             let distinct = Set(outcomes.compactMap(\.proposed))
             if distinct.count > bestOptions.count {
@@ -292,6 +305,7 @@ public enum Renamr {
         case .copyRest(_, let from, _, _): return from
         case .dateReformat(let r, _): return r.ordinal
         case .number(let r, _): return r.ordinal
+        case .sequence: return Int.max - 1
         case .literal: return Int.max
         }
     }

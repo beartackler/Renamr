@@ -17,8 +17,6 @@ struct RenamrApp: App {
             CommandGroup(after: .newItem) {
                 Button("Open Folder…") { RenameModel.shared.chooseFolder() }
                     .keyboardShortcut("o")
-                Button("Use Frontmost Finder Folder") { RenameModel.shared.openFrontmostFinderFolder() }
-                    .keyboardShortcut("f", modifiers: [.command, .shift])
             }
         }
     }
