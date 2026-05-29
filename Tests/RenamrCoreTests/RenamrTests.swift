@@ -98,6 +98,57 @@ final class RenamrTests: XCTestCase {
         XCTAssertEqual(out, ["photo.jpg", "shot.png", "clip.mp4"])
     }
 
+    // ---- Realistic filenames people actually have ----
+
+    // macOS screenshots: keep the date, keep the "Screenshot" label, drop the time.
+    func testRealScreenshots() {
+        let out = run(
+            example: ("Screenshot 2026-05-20 at 9.41.02 AM.png", "2026-05-20 Screenshot.png"),
+            files: [
+                "Screenshot 2026-05-20 at 9.41.02 AM.png",
+                "Screenshot 2026-05-22 at 2.13.55 PM.png",
+                "Screenshot 2026-05-29 at 7.18.42 PM.png",
+            ]
+        )
+        XCTAssertEqual(out, ["2026-05-20 Screenshot.png", "2026-05-22 Screenshot.png", "2026-05-29 Screenshot.png"])
+    }
+
+    // Pixel/Android photos: pull the date out of the filename, drop the rest.
+    func testRealPixelPhotos() {
+        let out = run(
+            example: ("PXL_20240115_103045.jpg", "2024-01-15.jpg"),
+            files: ["PXL_20240115_103045.jpg", "PXL_20240220_080012.jpg", "PXL_20240305_171530.jpg"]
+        )
+        XCTAssertEqual(out, ["2024-01-15.jpg", "2024-02-20.jpg", "2024-03-05.jpg"])
+    }
+
+    // DSLR dump: strip the prefix, keep the counter, lowercase the extension.
+    func testRealDslrStripAndLowercase() {
+        let out = run(
+            example: ("DSC0931.JPG", "0931.jpg"),
+            files: ["DSC0931.JPG", "DSC0942.JPG", "DSC1003.JPG"]
+        )
+        XCTAssertEqual(out, ["0931.jpg", "0942.jpg", "1003.jpg"])
+    }
+
+    // iPhone dump: batch-label a trip, keep the counter, lowercase the extension.
+    func testRealConstantLabelPlusCounter() {
+        let out = run(
+            example: ("IMG_4004.HEIC", "Trip 4004.heic"),
+            files: ["IMG_4004.HEIC", "IMG_4005.HEIC", "IMG_4006.HEIC"]
+        )
+        XCTAssertEqual(out, ["Trip 4004.heic", "Trip 4005.heic", "Trip 4006.heic"])
+    }
+
+    // Abbreviation by prefix: January -> Jan generalizes to Feb, Mar, ...
+    func testPrefixAbbreviation() {
+        let out = run(
+            example: ("January_2024.txt", "Jan 2024.txt"),
+            files: ["January_2024.txt", "February_2024.txt", "March_2024.txt"]
+        )
+        XCTAssertEqual(out, ["Jan 2024.txt", "Feb 2024.txt", "Mar 2024.txt"])
+    }
+
     // Tokenizer: a date is one token; an alpha-prefixed counter splits in two.
     func testTokenization() {
         let tokens = Tokenizer.tokenize("IMG_20240115_beach_DSC0931")

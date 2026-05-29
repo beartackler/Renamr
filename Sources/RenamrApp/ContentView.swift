@@ -5,161 +5,140 @@ import RenamrCore
 struct ContentView: View {
     @EnvironmentObject var model: RenameModel
     @State private var dropTargeted = false
+    @State private var pulse = false
+    @FocusState private var editing: Bool
 
     var body: some View {
         VStack(spacing: 0) {
             header
-            Divider()
+            Divider().opacity(0.5)
             Group {
-                if model.hasFolder { mainPanes } else { emptyState }
+                if model.hasFolder { fileList } else { emptyState }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            Divider()
+            Divider().opacity(0.5)
             footer
         }
+        .onDrop(of: [.fileURL], isTargeted: $dropTargeted) { model.handleDrop($0) }
     }
 
     // MARK: header
 
     private var header: some View {
         HStack(spacing: 8) {
-            Image(systemName: "wand.and.stars").foregroundStyle(.tint)
+            Image(systemName: "wand.and.stars")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Brand.gradient)
             Text("Renamr").font(.headline)
             Text(Voice.tagline).font(.caption).foregroundStyle(.secondary)
             if model.hasFolder {
                 Button { model.chooseFolder() } label: { Image(systemName: "folder") }
                     .buttonStyle(.borderless).help("Open a different folder")
+                if model.directoryURL != nil {
+                    Text(model.directoryURL!.lastPathComponent).font(.caption).foregroundStyle(.tertiary).lineLimit(1)
+                }
             }
             Spacer()
             Text(model.statusMessage).font(.callout).foregroundStyle(.secondary).lineLimit(1)
+                .animation(.default, value: model.statusMessage)
         }
-        .padding(.horizontal, 12).padding(.vertical, 9)
+        .padding(.horizontal, 14).padding(.vertical, 10)
     }
 
     // MARK: empty state
 
     private var emptyState: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "wand.and.stars").font(.system(size: 50)).foregroundStyle(.tint.opacity(0.85))
-            Text(Voice.emptyTitle).font(.title3.weight(.medium))
-            Text(Voice.emptySubtitle)
-                .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
-            HStack(spacing: 10) {
-                Button("Open Folder…") { model.chooseFolder() }.controlSize(.large)
-                Button("Use Frontmost Finder Folder") { model.openFrontmostFinderFolder() }.controlSize(.large)
+        VStack(spacing: 16) {
+            ZStack {
+                Circle().fill(Brand.gradient)
+                    .frame(width: 96, height: 96)
+                    .shadow(color: Brand.accent.opacity(pulse ? 0.55 : 0.3), radius: pulse ? 26 : 16)
+                    .scaleEffect(pulse ? 1.03 : 1.0)
+                Image(systemName: "wand.and.stars")
+                    .font(.system(size: 42, weight: .semibold))
+                    .foregroundStyle(.white)
             }
-            .padding(.top, 4)
+            .onAppear { withAnimation(.easeInOut(duration: 1.9).repeatForever(autoreverses: true)) { pulse = true } }
+
+            VStack(spacing: 6) {
+                Text(Voice.emptyTitle).font(.title2.weight(.semibold))
+                Text(Voice.emptySubtitle)
+                    .font(.callout).foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center).frame(maxWidth: 420)
+            }
+
+            HStack(spacing: 10) {
+                Button("Open Folder…") { model.chooseFolder() }
+                    .buttonStyle(.borderedProminent).tint(Brand.accent).controlSize(.large)
+                Button("Use Frontmost Finder Folder") { model.openFrontmostFinderFolder() }
+                    .controlSize(.large)
+            }
+            .padding(.top, 2)
+
             Label(Voice.finderTip, systemImage: "contextualmenu.and.cursorarrow")
-                .font(.caption).foregroundStyle(.tertiary).padding(.top, 6)
+                .font(.caption).foregroundStyle(.tertiary).padding(.top, 4)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(40)
-        .background(dropTargeted ? Color.accentColor.opacity(0.12) : Color.clear)
+        .background(dropTargeted ? Brand.accent.opacity(0.08) : Color.clear)
         .contentShape(Rectangle())
-        .onDrop(of: [.fileURL], isTargeted: $dropTargeted) { model.handleDrop($0) }
     }
 
-    // MARK: main
-
-    private var mainPanes: some View {
-        HStack(spacing: 0) {
-            fileList.frame(width: 290)
-            Divider()
-            rightPane.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        }
-        .onDrop(of: [.fileURL], isTargeted: $dropTargeted) { model.handleDrop($0) }
-    }
+    // MARK: the unified, inline-editable list
 
     private var fileList: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(spacing: 0) {
+            if let prompt = model.needsMoreInfo { disagreementBanner(prompt).padding([.horizontal, .top], 12) }
+
             HStack {
-                Text("Files").font(.headline)
+                Text(model.selectedFile == nil ? "Click a file and type its new name" : "Type the new name — the rest follow")
+                    .font(.callout).foregroundStyle(.secondary)
                 Spacer()
-                if !model.examples.isEmpty {
-                    Text("learning from \(model.examples.count)")
-                        .font(.caption2).foregroundStyle(.secondary)
+                if model.examples.count >= 1 {
+                    Label("learning from \(model.examples.count)", systemImage: "brain")
+                        .font(.caption2).foregroundStyle(Brand.accent)
                 }
             }
-            .padding(8)
-            List(
-                model.files,
-                id: \.self,
-                selection: Binding(get: { model.selectedFile }, set: { if let n = $0 { model.selectExample(n) } })
-            ) { name in
-                HStack(spacing: 6) {
-                    if model.preselected.contains(name) {
-                        Image(systemName: "circle.fill").font(.system(size: 5)).foregroundStyle(.tint)
+            .padding(.horizontal, 14).padding(.top, 10).padding(.bottom, 4)
+
+            ScrollView {
+                LazyVStack(spacing: 2) {
+                    ForEach(model.previews) { preview in
+                        FileRow(
+                            preview: preview,
+                            isSelected: preview.original == model.selectedFile,
+                            correctedName: $model.correctedName,
+                            editing: $editing,
+                            onTap: { model.selectExample(preview.original); editing = true },
+                            onEdit: { model.recompute() }
+                        )
                     }
-                    Text(name).font(.system(.body, design: .monospaced)).lineLimit(1)
                 }
-            }
-        }
-    }
-
-    private var rightPane: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if model.selectedFile != nil {
-                Text(model.examples.count >= 1 ? Voice.teachHeaderMore : Voice.teachHeaderFirst)
-                    .font(.headline)
-                TextField("corrected name", text: $model.correctedName)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.system(.body, design: .monospaced))
-                    .onChange(of: model.correctedName) { _ in model.recompute() }
-                    .onSubmit { model.recompute() }
-            } else {
-                Text(Voice.pickPrompt).foregroundStyle(.secondary)
+                .padding(.horizontal, 10).padding(.bottom, 8)
+                .animation(.easeOut(duration: 0.18), value: model.previews)
             }
 
-            if let prompt = model.needsMoreInfo { disagreementBanner(prompt) }
-
-            if !model.warnings.isEmpty {
-                Text(model.warnings.joined(separator: "\n")).font(.caption).foregroundStyle(.orange)
-            }
-
-            HStack {
-                Text("Preview").font(.subheadline).foregroundStyle(.secondary)
-                Spacer()
-                if model.confidentChangeCount > 0 {
-                    Text("\(model.confidentChangeCount) will change").font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            previewList
             if model.flaggedCount > 0 {
                 Label(Voice.safety, systemImage: "lock.shield")
                     .font(.caption2).foregroundStyle(.secondary)
+                    .padding(.horizontal, 14).padding(.bottom, 8)
             }
         }
-        .padding(12)
     }
 
     private func disagreementBanner(_ prompt: DisagreementPrompt) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: "questionmark.bubble").foregroundStyle(.orange)
+        HStack(alignment: .top, spacing: 9) {
+            Image(systemName: "questionmark.bubble.fill").foregroundStyle(Brand.accent)
             VStack(alignment: .leading, spacing: 3) {
-                Text(Voice.ambiguityTitle).font(.callout.weight(.medium))
+                Text(Voice.ambiguityTitle).font(.callout.weight(.semibold))
                 Text("For “\(prompt.file)”, did you mean " + prompt.options.prefix(2).map { "“\($0)”" }.joined(separator: " or ") + "?")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            Button("Teach me") { model.teachAmbiguousFile() }.controlSize(.small)
+            Button("Teach me") { model.teachAmbiguousFile(); editing = true }.controlSize(.small)
         }
-        .padding(10)
-        .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
-    }
-
-    private var previewList: some View {
-        List(model.previews) { preview in
-            HStack(spacing: 8) {
-                Image(systemName: icon(for: preview)).foregroundStyle(tint(for: preview))
-                Text(preview.original).font(.system(.caption, design: .monospaced)).foregroundStyle(.secondary).lineLimit(1)
-                Image(systemName: "arrow.right").font(.caption2).foregroundStyle(.tertiary)
-                Text(preview.proposed)
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(preview.isChange ? .primary : .secondary).lineLimit(1)
-                Spacer()
-            }
-            .help(preview.note ?? "")
-        }
+        .padding(11)
+        .background(Brand.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 9))
     }
 
     // MARK: footer
@@ -167,29 +146,79 @@ struct ContentView: View {
     private var footer: some View {
         HStack(spacing: 10) {
             if !model.examples.isEmpty || model.selectedFile != nil {
-                Button("Start over") { model.startOver() }.controlSize(.regular)
+                Button("Start over") { model.startOver(); editing = false }
             }
             if !model.lastBatch.isEmpty {
-                Button("Undo") { model.undo() }.controlSize(.regular)
+                Button("Undo") { model.undo() }
             }
             Spacer()
-            Button { model.apply() } label: {
+            Button { model.apply(); editing = false } label: {
                 Text(model.confidentChangeCount > 0 ? "Rename \(model.confidentChangeCount) files" : "Rename")
-                    .frame(minWidth: 130)
+                    .frame(minWidth: 140)
             }
+            .buttonStyle(.borderedProminent).tint(Brand.accent)
             .keyboardShortcut(.defaultAction)
             .disabled(model.confidentChangeCount == 0)
         }
-        .padding(10)
+        .padding(12)
+    }
+}
+
+/// One row: the original name, or an inline editor when it's the file you're
+/// teaching with. Changed rows show "→ newname" live.
+private struct FileRow: View {
+    let preview: RenamePreview
+    let isSelected: Bool
+    @Binding var correctedName: String
+    @FocusState.Binding var editing: Bool
+    let onTap: () -> Void
+    let onEdit: () -> Void
+
+    var body: some View {
+        HStack(spacing: 9) {
+            Image(systemName: icon).foregroundStyle(tint).font(.system(size: 12)).frame(width: 15)
+
+            if isSelected {
+                TextField("new name", text: $correctedName)
+                    .textFieldStyle(.plain)
+                    .font(.system(.body, design: .monospaced))
+                    .focused($editing)
+                    .onChange(of: correctedName) { _ in onEdit() }
+                    .onSubmit { onEdit() }
+            } else {
+                Text(preview.original)
+                    .font(.system(.body, design: .monospaced))
+                    .foregroundStyle(preview.isConfident ? .primary : .secondary)
+                    .lineLimit(1)
+                if preview.isChange {
+                    Spacer(minLength: 8)
+                    Image(systemName: "arrow.right").font(.caption2).foregroundStyle(.tertiary)
+                    Text(preview.proposed)
+                        .font(.system(.callout, design: .monospaced))
+                        .foregroundStyle(Brand.accent)
+                        .lineLimit(1)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 10).padding(.vertical, 7)
+        .background(
+            RoundedRectangle(cornerRadius: 7)
+                .fill(isSelected ? Brand.accent.opacity(0.14) : Color.clear)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture { onTap() }
     }
 
-    private func icon(for p: RenamePreview) -> String {
-        if !p.isConfident { return "questionmark.circle" }
-        return p.isChange ? "checkmark.circle.fill" : "circle"
+    private var icon: String {
+        if isSelected { return "pencil.circle.fill" }
+        if !preview.isConfident { return "questionmark.circle" }
+        return preview.isChange ? "checkmark.circle.fill" : "circle"
     }
 
-    private func tint(for p: RenamePreview) -> Color {
-        if !p.isConfident { return .orange }
-        return p.isChange ? .green : .secondary
+    private var tint: Color {
+        if isSelected { return Brand.accent }
+        if !preview.isConfident { return .orange }
+        return preview.isChange ? .green : .secondary.opacity(0.5)
     }
 }

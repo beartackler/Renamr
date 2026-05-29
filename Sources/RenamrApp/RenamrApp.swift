@@ -9,6 +9,7 @@ struct RenamrApp: App {
         WindowGroup("Renamr") {
             ContentView()
                 .environmentObject(RenameModel.shared)
+                .tint(Brand.accent)
                 .frame(minWidth: 780, minHeight: 500)
         }
         .windowResizability(.contentMinSize)

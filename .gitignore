@@ -12,3 +12,6 @@ xcuserdata/
 # macOS
 .DS_Store
 build/
+
+# generated iconset (regenerate via Scripts/make-icon.swift)
+*.iconset/

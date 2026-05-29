@@ -109,6 +109,10 @@ public enum Renamr {
                 out += s
             case .copy(let ref, let transform):
                 if let token = lookup(ref, in: byKind) { out += transform.apply(token.text) } else { resolved = false }
+            case .prefix(let ref, let length, let transform):
+                if let token = lookup(ref, in: byKind), token.text.count >= length {
+                    out += transform.apply(String(token.text.prefix(length)))
+                } else { resolved = false }
             case .dateReformat(let ref, let format):
                 if let token = lookup(ref, in: byKind), let date = token.date { out += format.format(date) } else { resolved = false }
             case .number(let ref, let padWidth):
@@ -174,6 +178,14 @@ public enum Renamr {
                 for transform in [CaseTransform.lower, .upper, .capitalizeFirst] where transform.apply(token.text) == out.text && token.text != out.text {
                     candidates.append((.copy(ref, transform), 2))
                 }
+                // Abbreviation: output is the first N chars of a word (January -> Jan).
+                if kind == .word, out.text.count >= 1, out.text.count < token.text.count {
+                    let head = String(token.text.prefix(out.text.count))
+                    for transform in [CaseTransform.identity, .lower, .upper, .capitalizeFirst] where transform.apply(head) == out.text {
+                        candidates.append((.prefix(ref, length: out.text.count, transform), 3))
+                        break
+                    }
+                }
                 if kind == .date, let date = token.date {
                     for format in DateFormatSig.allCases where format.format(date) == out.text {
                         candidates.append((.dateReformat(ref, format), 2))
@@ -236,6 +248,7 @@ public enum Renamr {
     private static func refOrdinal(_ instruction: Instruction) -> Int {
         switch instruction {
         case .copy(let r, _): return r.ordinal
+        case .prefix(let r, _, _): return r.ordinal
         case .dateReformat(let r, _): return r.ordinal
         case .number(let r, _): return r.ordinal
         case .literal: return Int.max

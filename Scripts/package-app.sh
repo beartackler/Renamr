@@ -38,6 +38,7 @@ cat > "${CONTENTS}/Info.plist" <<PLIST
 <dict>
     <key>CFBundleName</key><string>${APP_NAME}</string>
     <key>CFBundleDisplayName</key><string>${APP_NAME}</string>
+    <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundleExecutable</key><string>${APP_NAME}</string>
     <key>CFBundleIdentifier</key><string>${BUNDLE_ID}</string>
     <key>CFBundleShortVersionString</key><string>${VERSION}</string>
@@ -61,6 +62,11 @@ cat > "${CONTENTS}/Info.plist" <<PLIST
 </dict>
 </plist>
 PLIST
+
+if [ -f Resources/AppIcon.icns ]; then
+    cp Resources/AppIcon.icns "${CONTENTS}/Resources/AppIcon.icns"
+    echo "==> bundled app icon"
+fi
 
 echo "==> ad-hoc codesign (local use)"
 codesign --force --sign - "${APP}" >/dev/null 2>&1 || codesign --force --sign - "${APP}"

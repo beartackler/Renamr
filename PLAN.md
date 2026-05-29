@@ -25,14 +25,24 @@ The moat is **execution quality**, not idea novelty (StringSolver proves the int
 - [x] Live **preview table** with confident/change/uncertain markers
 - [x] Teach-by-example: pick a file, type the corrected name; **multiple examples** accumulate; the disagreement banner jumps you to the file Renamr is unsure about
 - [x] Rename with collision-skip (never clobber) + **undo** + start-over
-- [ ] Inline edit in the file row (edit the name in place) instead of a side field
-- [ ] Folder bookmarks / security-scoped access; app icon; polish unconfident-row display (show original, not partial)
+- [x] **Inline edit in the file row** — one unified list; click a file, type its new name in place, the rest preview live with "→ newname"
+- [x] **Visual redesign** — violet "magic" brand, livelier empty state (animated hero), prominent gradient actions, cohesive tint
+- [x] **App icon** — `Scripts/make-icon.swift` renders a brand-gradient squircle + wand → `Resources/AppIcon.icns`, bundled by `package-app.sh`
+- [x] Unconfident rows show the original name, not a partial string
+- [ ] Folder bookmarks / security-scoped access (for a sandboxed future build)
+
+## Engine reliability additions
+- [x] Extension-case normalization (PHOTO.JPG → photo.jpg, per-file)
+- [x] Prefix/abbreviation extraction (January → Jan, generalizes to Feb/Mar)
+- [x] **Realistic-filename test coverage** — screenshots, Pixel, DSLR strip+counter, trip-label+counter (14 tests). Proven on names people actually have.
+- [ ] **Variable-length fields** (the real next gap) — "keep the rest of the words" (song titles, movie names) doesn't generalize yet; needs span/“rest-of” operators
+- [ ] Full version-space algebra for compound ambiguity; time tokens (screenshot times); date-locale (01/02) resolution
 
 ## Milestone 3.5 — Meet users IN Finder (reduce the "open an app and drag" friction)
 The real workflow is files in Finder, not dragging into a window.
 - [x] **macOS Service** "Rename by Example with Renamr" — select files in Finder ▸ right-click ▸ Services ▸ Renamr opens pre-scoped to them (`NSServices` in Info.plist + `ServiceProvider`). *Note: appears after the app is in /Applications and LaunchServices/`pbs` refreshes (re-login or `/System/Library/CoreServices/pbs -update`).*
 - [x] **"Use Frontmost Finder Folder"** command (⇧⌘F) — reads the front Finder window via AppleScript so you skip dragging (one-time Automation permission for Finder).
-- [x] **Finder Sync extension** — built via an Xcode project (XcodeGen `project.yml`; the engine stays a SwiftPM package both the app and extension depend on). `RenamrFinderExtension.appex` embeds in `Renamr.app`, ad-hoc signed = **$0, no Developer ID**. `RenamrFinderSync` (FIFinderSync) adds the contextual + toolbar "Rename by Example" item and hands the selection to the app (`application(_:open:)`). Build: `xcodegen generate && xcodebuild -scheme Renamr build`. *Caveat: ad-hoc/un-notarized extensions are finicky to enable for end users — Developer ID makes it clean, so pair full rollout with the pay-$99 trigger. The macOS Service remains the reliable $0 fallback.* After adding/removing source files, re-run `xcodegen generate`.
+- [removed] **Finder Sync extension** — prototyped (XcodeGen + `.appex`, ad-hoc) and then **deleted**: an un-notarized extension won't reliably load for end users, so it can't ship $0 — it would force the $99 Developer ID. The **macOS Service** ("right-click ▸ Rename by Example") + **"Use Frontmost Finder Folder"** cover the in-Finder workflow with no extension and no signing. Back to a pure SwiftPM build (no Xcode project). Revisit the extension only if we ever take Developer ID.
 
 ## Milestone 4 — Ship for $0 (no Apple Developer Program)
 Decision (2026-05-29): ship free. The $99/yr only deletes a *one-time* first-launch
