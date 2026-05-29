@@ -8,14 +8,10 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            toolbar
+            header
             Divider()
             Group {
-                if model.directoryURL == nil {
-                    dropZone
-                } else {
-                    mainPanes
-                }
+                if model.hasFolder { mainPanes } else { emptyState }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             Divider()
@@ -23,52 +19,79 @@ struct ContentView: View {
         }
     }
 
-    private var toolbar: some View {
-        HStack(spacing: 10) {
-            Button("Open Folder…") { model.chooseFolder() }
-            if let url = model.directoryURL {
-                Image(systemName: "folder").foregroundStyle(.secondary)
-                Text(url.lastPathComponent).foregroundStyle(.secondary).lineLimit(1)
+    // MARK: header
+
+    private var header: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "wand.and.stars").foregroundStyle(.tint)
+            Text("Renamr").font(.headline)
+            Text("rename by example").font(.caption).foregroundStyle(.secondary)
+            if model.hasFolder {
+                Button { model.chooseFolder() } label: { Image(systemName: "folder") }
+                    .buttonStyle(.borderless).help("Open a different folder")
             }
             Spacer()
-            Text(model.statusMessage).foregroundStyle(.secondary).font(.callout)
+            Text(model.statusMessage).font(.callout).foregroundStyle(.secondary).lineLimit(1)
         }
-        .padding(10)
+        .padding(.horizontal, 12).padding(.vertical, 9)
     }
 
-    private var dropZone: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "wand.and.stars").font(.system(size: 46)).foregroundStyle(.secondary)
-            Text("Drop a folder here").font(.title3)
-            Text("Then rename one file — the rest follow.").foregroundStyle(.secondary)
-            Button("Open Folder…") { model.chooseFolder() }.padding(.top, 4)
+    // MARK: empty state
+
+    private var emptyState: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "wand.and.stars").font(.system(size: 50)).foregroundStyle(.tint.opacity(0.85))
+            Text("Show me one. I'll do the rest.").font(.title3.weight(.medium))
+            Text("Fix a single filename — Renamr spots the pattern and renames the whole folder.")
+                .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            HStack(spacing: 10) {
+                Button("Open Folder…") { model.chooseFolder() }.controlSize(.large)
+                Button("Use Frontmost Finder Folder") { model.openFrontmostFinderFolder() }.controlSize(.large)
+            }
+            .padding(.top, 4)
+            Label("Tip: right-click files in Finder ▸ Rename by Example", systemImage: "contextualmenu.and.cursorarrow")
+                .font(.caption).foregroundStyle(.tertiary).padding(.top, 6)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(40)
         .background(dropTargeted ? Color.accentColor.opacity(0.12) : Color.clear)
         .contentShape(Rectangle())
-        .onDrop(of: [.fileURL], isTargeted: $dropTargeted) { providers in model.handleDrop(providers) }
+        .onDrop(of: [.fileURL], isTargeted: $dropTargeted) { model.handleDrop($0) }
     }
+
+    // MARK: main
 
     private var mainPanes: some View {
         HStack(spacing: 0) {
-            fileList.frame(width: 280)
+            fileList.frame(width: 290)
             Divider()
             rightPane.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
+        .onDrop(of: [.fileURL], isTargeted: $dropTargeted) { model.handleDrop($0) }
     }
 
     private var fileList: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Files").font(.headline).padding(8)
+            HStack {
+                Text("Files").font(.headline)
+                Spacer()
+                if !model.examples.isEmpty {
+                    Text("learning from \(model.examples.count)")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+            }
+            .padding(8)
             List(
                 model.files,
                 id: \.self,
-                selection: Binding(
-                    get: { model.selectedFile },
-                    set: { if let name = $0 { model.selectExample(name) } }
-                )
+                selection: Binding(get: { model.selectedFile }, set: { if let n = $0 { model.selectExample(n) } })
             ) { name in
-                Text(name).font(.system(.body, design: .monospaced)).lineLimit(1)
+                HStack(spacing: 6) {
+                    if model.preselected.contains(name) {
+                        Image(systemName: "circle.fill").font(.system(size: 5)).foregroundStyle(.tint)
+                    }
+                    Text(name).font(.system(.body, design: .monospaced)).lineLimit(1)
+                }
             }
         }
     }
@@ -76,58 +99,80 @@ struct ContentView: View {
     private var rightPane: some View {
         VStack(alignment: .leading, spacing: 10) {
             if model.selectedFile != nil {
-                Text("Rename this one — the rest follow").font(.headline)
+                Text(model.examples.count >= 1 ? "Fix another, if I got one wrong" : "Rename this one — I'll learn the pattern")
+                    .font(.headline)
                 TextField("corrected name", text: $model.correctedName)
                     .textFieldStyle(.roundedBorder)
                     .font(.system(.body, design: .monospaced))
                     .onChange(of: model.correctedName) { _ in model.recompute() }
                     .onSubmit { model.recompute() }
             } else {
-                Text("Pick a file on the left, then type its corrected name.")
+                Text("Pick a file on the left, then type what it should be called.")
                     .foregroundStyle(.secondary)
             }
 
+            if let prompt = model.needsMoreInfo { disagreementBanner(prompt) }
+
             if !model.warnings.isEmpty {
-                Text(model.warnings.joined(separator: "\n"))
-                    .font(.caption).foregroundStyle(.orange)
+                Text(model.warnings.joined(separator: "\n")).font(.caption).foregroundStyle(.orange)
             }
 
-            Text("Preview").font(.subheadline).foregroundStyle(.secondary)
+            HStack {
+                Text("Preview").font(.subheadline).foregroundStyle(.secondary)
+                Spacer()
+                if model.confidentChangeCount > 0 {
+                    Text("\(model.confidentChangeCount) will change").font(.caption).foregroundStyle(.secondary)
+                }
+            }
             previewList
         }
         .padding(12)
     }
 
+    private func disagreementBanner(_ prompt: DisagreementPrompt) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "questionmark.bubble").foregroundStyle(.orange)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Two ways to read that.").font(.callout.weight(.medium))
+                Text("For “\(prompt.file)”, did you mean " + prompt.options.prefix(2).map { "“\($0)”" }.joined(separator: " or ") + "?")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button("Teach me") { model.teachAmbiguousFile() }.controlSize(.small)
+        }
+        .padding(10)
+        .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+    }
+
     private var previewList: some View {
         List(model.previews) { preview in
             HStack(spacing: 8) {
-                Image(systemName: icon(for: preview))
-                    .foregroundStyle(tint(for: preview))
-                Text(preview.original)
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(.secondary).lineLimit(1)
+                Image(systemName: icon(for: preview)).foregroundStyle(tint(for: preview))
+                Text(preview.original).font(.system(.caption, design: .monospaced)).foregroundStyle(.secondary).lineLimit(1)
                 Image(systemName: "arrow.right").font(.caption2).foregroundStyle(.tertiary)
                 Text(preview.proposed)
                     .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(preview.isChange ? .primary : .secondary)
-                    .lineLimit(1)
+                    .foregroundStyle(preview.isChange ? .primary : .secondary).lineLimit(1)
                 Spacer()
             }
             .help(preview.note ?? "")
         }
     }
 
+    // MARK: footer
+
     private var footer: some View {
-        HStack {
+        HStack(spacing: 10) {
+            if !model.examples.isEmpty || model.selectedFile != nil {
+                Button("Start over") { model.startOver() }.controlSize(.regular)
+            }
             if !model.lastBatch.isEmpty {
-                Button("Undo") { model.undo() }
+                Button("Undo") { model.undo() }.controlSize(.regular)
             }
             Spacer()
-            Button {
-                model.apply()
-            } label: {
+            Button { model.apply() } label: {
                 Text(model.confidentChangeCount > 0 ? "Rename \(model.confidentChangeCount) files" : "Rename")
-                    .frame(minWidth: 120)
+                    .frame(minWidth: 130)
             }
             .keyboardShortcut(.defaultAction)
             .disabled(model.confidentChangeCount == 0)

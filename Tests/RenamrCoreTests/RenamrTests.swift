@@ -64,6 +64,28 @@ final class RenamrTests: XCTestCase {
         XCTAssertFalse(result.previews[1].isConfident, "a file with no date/second-word should not be claimed confident")
     }
 
+    // Two number fields with coincidentally-equal values: one example is
+    // ambiguous (was it the 1st or the 2nd number?), so Renamr should ask for a
+    // second example on the file where the rival rules disagree — not guess.
+    func testAmbiguityIsFlagged() {
+        let result = Renamr.synthesize(
+            examples: [("report_2023_2023.csv", "2023.csv")],
+            files: ["report_2021_2099.csv", "report_2023_2023.csv", "report_1990_2050.csv"]
+        )
+        XCTAssertNotNil(result.needsMoreInfo, "ambiguous single example should request a second")
+        XCTAssertEqual(result.needsMoreInfo?.options.count, 2)
+    }
+
+    // A second example collapses the ambiguity to a single rule.
+    func testSecondExampleResolvesAmbiguity() {
+        let result = Renamr.synthesize(
+            examples: [("report_2023_2023.csv", "2023.csv"), ("report_2021_2099.csv", "2021.csv")],
+            files: ["report_2021_2099.csv", "report_2023_2023.csv", "report_1990_2050.csv"]
+        )
+        XCTAssertNil(result.needsMoreInfo, "two examples should resolve the ambiguity")
+        XCTAssertEqual(result.previews.map(\.proposed), ["2021.csv", "2023.csv", "1990.csv"])
+    }
+
     // Tokenizer: a date is one token; an alpha-prefixed counter splits in two.
     func testTokenization() {
         let tokens = Tokenizer.tokenize("IMG_20240115_beach_DSC0931")

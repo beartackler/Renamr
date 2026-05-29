@@ -22,16 +22,29 @@ public struct RenamePreview: Equatable, Sendable, Identifiable {
     public var isChange: Bool { isConfident && proposed != original }
 }
 
-public struct SynthesisResult: Sendable {
-    /// The inferred program, or nil if no example was provided.
-    public let program: Program?
-    public let previews: [RenamePreview]
-    /// Non-fatal problems (e.g. the program could not reproduce a given example).
-    public let warnings: [String]
+/// Raised when one example leaves genuine ambiguity: at least two equally-good
+/// programs survive and produce *different* names for some file. Resolving it is
+/// a single extra example on that file.
+public struct DisagreementPrompt: Equatable, Sendable {
+    /// The file where the surviving programs disagree the most (most distinct outcomes).
+    public let file: String
+    /// The competing proposed names for that file (what the rival rules would do).
+    public let options: [String]
 }
 
-/// Public entry point. Give it one (or a few) corrected filenames and the
-/// folder; it infers the transformation and previews it across every file.
+public struct SynthesisResult: Sendable {
+    /// The chosen program, or nil if no example was provided.
+    public let program: Program?
+    public let previews: [RenamePreview]
+    /// Non-fatal problems (e.g. the examples couldn't be reconciled into one rule).
+    public let warnings: [String]
+    /// Set when a second example would resolve real ambiguity. nil when confident.
+    public let needsMoreInfo: DisagreementPrompt?
+}
+
+/// Public entry point. Give it one (or a few) corrected filenames and the folder;
+/// it infers the transformation, previews it, and tells you when one more example
+/// would resolve an ambiguity.
 public enum Renamr {
 
     public static func synthesize(
@@ -39,38 +52,46 @@ public enum Renamr {
         files: [String]
     ) -> SynthesisResult {
         guard let first = examples.first else {
-            let previews = files.map {
-                RenamePreview(original: $0, proposed: $0, isConfident: false, note: "No example provided")
-            }
-            return SynthesisResult(program: nil, previews: previews, warnings: ["No example provided"])
+            return SynthesisResult(
+                program: nil,
+                previews: files.map { RenamePreview(original: $0, proposed: $0, isConfident: false, note: "No example provided") },
+                warnings: ["No example provided"],
+                needsMoreInfo: nil
+            )
         }
 
-        let program = inferProgram(before: first.before, after: first.after)
-
+        // Build the competing programs implied by the first example (primary +
+        // one variant per ambiguous field), then keep only those consistent with
+        // every example given. Extra examples collapse the ambiguity.
+        let candidates = candidatePrograms(before: first.before, after: first.after)
+        let consistent = candidates.filter { program in
+            examples.allSatisfy { apply(program: program, to: $0.before).proposed == $0.after }
+        }
         var warnings: [String] = []
-        for ex in examples {
-            let result = apply(program: program, to: ex.before)
-            if result.proposed != ex.after {
-                warnings.append(
-                    "Program does not reproduce example: \(ex.before) -> expected \(ex.after), got \(result.proposed ?? "<unresolved>")"
-                )
-            }
+        let alive: [Program]
+        if consistent.isEmpty {
+            alive = Array(candidates.prefix(1))
+            warnings.append("Couldn't find a single rule that fits all your examples — using the closest.")
+        } else {
+            alive = consistent
         }
 
+        let best = alive[0]   // all alive programs tie on the examples; primary is first
         let previews = files.map { file -> RenamePreview in
-            let result = apply(program: program, to: file)
+            let result = apply(program: best, to: file)
             if let proposed = result.proposed, result.resolved {
                 return RenamePreview(original: file, proposed: proposed, isConfident: true, note: nil)
-            } else {
-                return RenamePreview(
-                    original: file,
-                    proposed: result.proposed ?? file,
-                    isConfident: false,
-                    note: "Some fields could not be located in this file"
-                )
             }
+            return RenamePreview(
+                original: file,
+                proposed: result.proposed ?? file,
+                isConfident: false,
+                note: "Some fields could not be located in this file"
+            )
         }
-        return SynthesisResult(program: program, previews: previews, warnings: warnings)
+
+        let needsMoreInfo = disagreement(programs: alive, files: files)
+        return SynthesisResult(program: best, previews: previews, warnings: warnings, needsMoreInfo: needsMoreInfo)
     }
 
     /// Apply a learned program to a single filename.
@@ -85,120 +106,119 @@ public enum Renamr {
             case .literal(let s):
                 out += s
             case .copy(let ref, let transform):
-                if let token = lookup(ref, in: byKind) {
-                    out += transform.apply(token.text)
-                } else {
-                    resolved = false
-                }
+                if let token = lookup(ref, in: byKind) { out += transform.apply(token.text) } else { resolved = false }
             case .dateReformat(let ref, let format):
-                if let token = lookup(ref, in: byKind), let date = token.date {
-                    out += format.format(date)
-                } else {
-                    resolved = false
-                }
+                if let token = lookup(ref, in: byKind), let date = token.date { out += format.format(date) } else { resolved = false }
             case .number(let ref, let padWidth):
-                if let token = lookup(ref, in: byKind), let value = token.intValue {
-                    out += formatNumber(value, pad: padWidth)
-                } else {
-                    resolved = false
-                }
+                if let token = lookup(ref, in: byKind), let value = token.intValue { out += formatNumber(value, pad: padWidth) } else { resolved = false }
             }
         }
 
         switch program.ext {
-        case .keepOriginal:
-            if !ext.isEmpty { out += "." + ext }
-        case .constant(let e):
-            if !e.isEmpty { out += "." + e }
+        case .keepOriginal: if !ext.isEmpty { out += "." + ext }
+        case .constant(let e): if !e.isEmpty { out += "." + e }
         }
         return (out, resolved)
     }
 
-    // MARK: - Synthesis
+    // MARK: - Candidate programs (the version space, kept small)
 
-    /// Infer a program from a single (before, after) pair.
-    ///
-    /// For each output token we enumerate every way an input token could
-    /// explain it (identity / re-case / date-reformat / number-repad) plus the
-    /// literal fallback, then pick the cheapest explanation. The cost function
-    /// is the simplicity prior: a copy/transform of real data beats hard-coding
-    /// a literal, while separators (which match no input token) fall through to
-    /// cheap literals. That bias is what produces the "it just knew" behaviour
-    /// from a single example.
-    static func inferProgram(before: String, after: String) -> Program {
+    /// All programs implied by a single example: the primary (cheapest explanation
+    /// per output token) plus, for each *ambiguous* token (a tie at the minimal
+    /// cost), one variant that flips just that token. Single-flip variants are
+    /// enough to detect "which field did you mean?" disagreements while staying
+    /// bounded — no combinatorial blow-up.
+    static func candidatePrograms(before: String, after: String) -> [Program] {
         let (beforeStem, beforeExt) = splitName(before)
         let (afterStem, afterExt) = splitName(after)
-        let inputTokens = Tokenizer.tokenize(beforeStem)
+        let byKind = indexByKind(Tokenizer.tokenize(beforeStem))
         let outputTokens = Tokenizer.tokenize(afterStem)
-        let byKind = indexByKind(inputTokens)
 
-        var instructions: [Instruction] = []
-        for outToken in outputTokens {
-            let candidate = bestExplanation(for: outToken, byKind: byKind)
-            instructions.append(candidate)
+        var perToken: [[Instruction]] = []
+        for out in outputTokens {
+            let cands = explanations(for: out, byKind: byKind)
+            let minCost = cands.map(\.1).min() ?? 12
+            var tier = uniqued(cands.filter { $0.1 == minCost }.map(\.0))
+            tier.sort { refOrdinal($0) < refOrdinal($1) }
+            perToken.append(tier.isEmpty ? [.literal(out.text)] : tier)
         }
 
         let extPolicy: ExtensionPolicy = (beforeExt == afterExt) ? .keepOriginal : .constant(afterExt)
-        return Program(instructions: instructions, ext: extPolicy)
+        let primary = perToken.map { $0[0] }
+        var programs: [[Instruction]] = [primary]
+        for (index, choices) in perToken.enumerated() where choices.count > 1 {
+            for alternative in choices.dropFirst() {
+                var variant = primary
+                variant[index] = alternative
+                programs.append(variant)
+            }
+        }
+        return programs.map { Program(instructions: $0, ext: extPolicy) }
     }
 
-    private struct Candidate { let instruction: Instruction; let cost: Int }
-
-    private static func bestExplanation(for out: Token, byKind: [TokenKind: [Token]]) -> Instruction {
-        var candidates: [Candidate] = []
-
+    /// Every way an input token could explain one output token, with a cost.
+    /// The simplicity prior: copying/transforming real data is cheap, hard-coding
+    /// a data-looking literal is expensive, separators-as-literals are cheap.
+    private static func explanations(for out: Token, byKind: [TokenKind: [Token]]) -> [(Instruction, Int)] {
+        var candidates: [(Instruction, Int)] = []
         for (kind, tokens) in byKind {
             if kind == .separator { continue }   // never reference separators; they become literals
             for (ordinal, token) in tokens.enumerated() {
                 let ref = SourceRef(kind: kind, ordinal: ordinal)
-
                 if token.text == out.text {
-                    candidates.append(Candidate(instruction: .copy(ref, .identity), cost: 1))
+                    candidates.append((.copy(ref, .identity), 1))
                 }
-                for transform in [CaseTransform.lower, .upper, .capitalizeFirst] {
-                    if transform.apply(token.text) == out.text && token.text != out.text {
-                        candidates.append(Candidate(instruction: .copy(ref, transform), cost: 2))
-                    }
+                for transform in [CaseTransform.lower, .upper, .capitalizeFirst] where transform.apply(token.text) == out.text && token.text != out.text {
+                    candidates.append((.copy(ref, transform), 2))
                 }
                 if kind == .date, let date = token.date {
                     for format in DateFormatSig.allCases where format.format(date) == out.text {
-                        candidates.append(Candidate(instruction: .dateReformat(ref, format), cost: 2))
+                        candidates.append((.dateReformat(ref, format), 2))
                     }
                 }
                 if kind == .number, let value = token.intValue, out.text.allSatisfy({ $0.isNumber }) {
                     for pad in [0, out.text.count] {
                         let formatted = formatNumber(value, pad: pad)
                         if formatted == out.text && formatted != token.text {
-                            candidates.append(Candidate(instruction: .number(ref, padWidth: pad), cost: 2))
+                            candidates.append((.number(ref, padWidth: pad), 2))
                         }
                     }
                 }
             }
         }
+        candidates.append((.literal(out.text), out.kind == .separator ? 1 : 12))
+        return candidates
+    }
 
-        // Literal fallback: cheap for separators, expensive for data-looking tokens.
-        let literalCost = (out.kind == .separator) ? 1 : 12
-        candidates.append(Candidate(instruction: .literal(out.text), cost: literalCost))
-
-        // Deterministic pick: lowest cost, then prefer non-literal, then lowest ordinal.
-        let best = candidates.min { a, b in
-            if a.cost != b.cost { return a.cost < b.cost }
-            let aLit = isLiteral(a.instruction), bLit = isLiteral(b.instruction)
-            if aLit != bLit { return !aLit }
-            return refOrdinal(a.instruction) < refOrdinal(b.instruction)
+    /// Among surviving programs, the file with the most distinct competing
+    /// outcomes is the highest-information place to ask for one more example.
+    private static func disagreement(programs: [Program], files: [String]) -> DisagreementPrompt? {
+        guard programs.count > 1 else { return nil }
+        var bestFile: String?
+        var bestOptions: [String] = []
+        for file in files {
+            let outcomes = programs.map { apply(program: $0, to: file) }
+            guard outcomes.allSatisfy(\.resolved) else { continue }
+            let distinct = Set(outcomes.compactMap(\.proposed))
+            if distinct.count > bestOptions.count {
+                bestOptions = distinct.sorted()
+                bestFile = file
+            }
         }
-        return best?.instruction ?? .literal(out.text)
+        guard let file = bestFile, bestOptions.count > 1 else { return nil }
+        return DisagreementPrompt(file: file, options: bestOptions)
     }
 
     // MARK: - Helpers
 
-    private static func isLiteral(_ i: Instruction) -> Bool {
-        if case .literal = i { return true }
-        return false
+    private static func uniqued(_ instructions: [Instruction]) -> [Instruction] {
+        var result: [Instruction] = []
+        for instruction in instructions where !result.contains(instruction) { result.append(instruction) }
+        return result
     }
 
-    private static func refOrdinal(_ i: Instruction) -> Int {
-        switch i {
+    private static func refOrdinal(_ instruction: Instruction) -> Int {
+        switch instruction {
         case .copy(let r, _): return r.ordinal
         case .dateReformat(let r, _): return r.ordinal
         case .number(let r, _): return r.ordinal

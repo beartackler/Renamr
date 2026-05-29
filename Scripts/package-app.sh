@@ -46,6 +46,18 @@ cat > "${CONTENTS}/Info.plist" <<PLIST
     <key>LSMinimumSystemVersion</key><string>${MIN_MACOS}</string>
     <key>NSHighResolutionCapable</key><true/>
     <key>NSHumanReadableCopyright</key><string>MIT licensed.</string>
+    <key>NSAppleEventsUsageDescription</key><string>Renamr reads the front Finder window so it can rename the files you're already looking at.</string>
+    <key>NSServices</key>
+    <array>
+        <dict>
+            <key>NSMenuItem</key>
+            <dict><key>default</key><string>Rename by Example with Renamr</string></dict>
+            <key>NSMessage</key><string>renameByExample</string>
+            <key>NSPortName</key><string>${APP_NAME}</string>
+            <key>NSSendFileTypes</key>
+            <array><string>public.item</string></array>
+        </dict>
+    </array>
 </dict>
 </plist>
 PLIST

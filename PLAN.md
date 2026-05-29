@@ -12,20 +12,27 @@ The moat is **execution quality**, not idea novelty (StringSolver proves the int
 - [x] Test suite covering the headline cases (algorithm validated)
 
 ## Milestone 2 — Engine reliability (the hard 20%, ~3–4 mo)
-- [ ] **Version-space algebra** search (replace the greedy per-token pick) so multiple candidate programs are represented compactly and ranked
-- [ ] **Disambiguation-by-disagreement loop** — run top candidate programs across the folder, surface the maximally-disagreeing file, ask for a *second* example there (highest-information query)
-- [ ] **Multi-example synthesis** — intersect version spaces across examples instead of verify-only
+- [x] **Disambiguation-by-disagreement loop** — keep competing candidate programs (primary + one single-flip variant per ambiguous field), find the file where they disagree most, ask for a second example there (`SynthesisResult.needsMoreInfo`). Tested.
+- [x] **Multi-example synthesis (v1)** — synthesize candidates from the first example, keep only those consistent with all examples; a second example collapses the ambiguity. Tested.
+- [ ] **Full version-space algebra** — currently single-flip variants, not a compact full VSA; upgrade for deeper/compound ambiguities and combinatorial fields
 - [ ] Date ambiguity resolution (01/02 = Jan-2 vs Feb-1) via locale prior + cross-file agreement
 - [ ] Counter **resequencing** (1..N) in addition to repad/strip; alpha-prefix counters
 - [ ] Broaden token coverage: RAW sidecars, episode/season numbering, invoice IDs, camelCase/snake/kebab boundaries
 - [ ] Reliability corpus: a large set of real messy folders to push "it just knew" from ~80% → ~98%
 
-## Milestone 3 — The app (AppKit + SwiftUI, ~3–4 wk)
-- [ ] Drag-files / drop-folder window; SwiftUI chrome
-- [ ] Live **preview table** with per-row diff highlighting and uncertainty flags
-- [ ] Edit-one-cell-to-add-an-example interaction; show "needs a 2nd example" rows
-- [ ] Atomic rename with collision detection + **undo**
-- [ ] Folder bookmarks / security-scoped access (non-sandboxed direct build)
+## Milestone 3 — The app (AppKit + SwiftUI)
+- [x] Drop-folder / Open-folder window; SwiftUI chrome with **personality** (friendly empty state, witty status, warm disagreement prompt)
+- [x] Live **preview table** with confident/change/uncertain markers
+- [x] Teach-by-example: pick a file, type the corrected name; **multiple examples** accumulate; the disagreement banner jumps you to the file Renamr is unsure about
+- [x] Rename with collision-skip (never clobber) + **undo** + start-over
+- [ ] Inline edit in the file row (edit the name in place) instead of a side field
+- [ ] Folder bookmarks / security-scoped access; app icon; polish unconfident-row display (show original, not partial)
+
+## Milestone 3.5 — Meet users IN Finder (reduce the "open an app and drag" friction)
+The real workflow is files in Finder, not dragging into a window.
+- [x] **macOS Service** "Rename by Example with Renamr" — select files in Finder ▸ right-click ▸ Services ▸ Renamr opens pre-scoped to them (`NSServices` in Info.plist + `ServiceProvider`). *Note: appears after the app is in /Applications and LaunchServices/`pbs` refreshes (re-login or `/System/Library/CoreServices/pbs -update`).*
+- [x] **"Use Frontmost Finder Folder"** command (⇧⌘F) — reads the front Finder window via AppleScript so you skip dragging (one-time Automation permission for Finder).
+- [ ] **Finder Sync extension** — the ultimate: a Renamr button/contextual item right in the Finder toolbar, badges, monitored folders. **Architecture decision:** SwiftPM cannot build app-extension targets, so this requires migrating the *app* to an Xcode project (keep `RenamrCore` as the SwiftPM package the app + extension both depend on). Do this when we commit to the extension.
 
 ## Milestone 4 — Ship for $0 (no Apple Developer Program)
 Decision (2026-05-29): ship free. The $99/yr only deletes a *one-time* first-launch
