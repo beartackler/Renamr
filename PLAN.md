@@ -27,11 +27,19 @@ The moat is **execution quality**, not idea novelty (StringSolver proves the int
 - [ ] Atomic rename with collision detection + **undo**
 - [ ] Folder bookmarks / security-scoped access (non-sandboxed direct build)
 
-## Milestone 4 — Ship
-- [ ] Apple Developer ID + **codesign + notarize + staple** (the $99/yr is the one unavoidable cost; Sequoia removed the right-click-Open bypass)
-- [ ] `.dmg` via create-dmg; **Sparkle** auto-update (static appcast on the VPS or GitHub Releases)
-- [ ] One-page landing site (the demo GIF is the hero) on the cheap VPS; `.dmg` on GitHub Releases
-- [ ] Homebrew cask once stars clear the threshold
+## Milestone 4 — Ship for $0 (no Apple Developer Program)
+Decision (2026-05-29): ship free. The $99/yr only deletes a *one-time* first-launch
+dialog, so defer it until a trigger fires (below). Verified against current macOS 15
+Sequoia / 26 Tahoe.
+- [x] Ad-hoc sign the bundle (`codesign --force --sign - Renamr.app`) — REQUIRED so Apple Silicon launches it at all (kernel SIGKILLs zero-signature arm64). `package-app.sh` does this.
+- [ ] `.dmg` via create-dmg, hosted free on **GitHub Releases** (primary).
+- [ ] README **"First launch"** section, current flow: open once → System Settings ▸ Privacy & Security ▸ **Open Anyway** ▸ authenticate (move to /Applications first; entry expires ~1h; right-click→Open is DEAD since Sequoia — do NOT document it). Plus power-user one-liner: `xattr -dr com.apple.quarantine /Applications/Renamr.app`.
+- [ ] **Homebrew FORMULA (build-from-source)**, NOT a cask — locally compiled = ad-hoc signed, no quarantine ⇒ zero Gatekeeper friction. (Cask is off the table: quarantined by default, `--no-quarantine` deprecated in Homebrew 5.0.0, official tap disables un-notarized casks 2026-09-01.)
+- [ ] One-page landing site (demo GIF hero) on the cheap VPS; download → GitHub Releases.
+- [ ] Auto-update: **hold on Sparkle** — each update re-quarantines (re-triggers the dialog), which only notarization fixes; rely on `brew upgrade` / manual re-download until/unless we notarize.
+
+### Pay the $99 only when a trigger fires
+Non-technical users repeatedly report "damaged / can't open"; OR ~1k+ downloads / an HN-front-page moment where the next, less-technical wave should convert; OR you add Sparkle auto-update; OR donations/sponsors exceed $99/yr (the OBS/HandBrake graduation path). Until then, $0.
 
 ## Milestone 5 — Distribution
 - [ ] Launch: Show HN + r/macapps + Product Hunt, same day, leading with the demo GIF
